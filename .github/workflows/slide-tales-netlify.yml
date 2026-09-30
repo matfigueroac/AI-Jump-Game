@@ -991,6 +991,426 @@ jobs:
             exit 1
           fi
 
+      - name: Comic asset UI v3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p web/assets/ui
+          cp slide-tales-ui/retro-slide-tales-logo.webp web/assets/ui/retro-slide-tales-logo.webp
+
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          app = Path('web/app.js')
+          s = app.read_text()
+
+          header = """  function header() {
+            return '<header class="topbar comic-topbar">' +
+              '<button class="icon-btn comic-help" data-action="info" aria-label="How to play"><span>?</span></button>' +
+              '<div class="brand-lockup"><img class="brand-logo" src="./assets/ui/retro-slide-tales-logo.webp" alt="Retro Slide Tales"></div>' +
+              '<div class="star-badge comic-score" aria-label="Total stars"><span>★</span><b>' + totalStars() + '</b></div>' +
+            '</header>';
+          }"""
+          s = re.sub(r"  function header\(\) \{.*?\n  \}", header, s, count=1, flags=re.S)
+
+          home = """  function renderHome() {
+            const featured = dailyPuzzle();
+            return shell('<section class="screen home-screen comic-home">' +
+              '<div class="hero-lockup comic-tagline"><p class="hero-copy">PICK · SLIDE · SOLVE</p><p class="hero-sub"><span class="daily-dot">●</span> TODAY · ' + featured.title.toUpperCase() + '</p></div>' +
+              levelSelector() +
+              '<div class="daily-stage"><div class="daily-ribbon">TODAY\\'S PICK</div><div class="preview"><img fetchpriority="high" decoding="async" src="' + puzzleSrc(featured.id) + '" alt="' + featured.title + '">' + previewGrid() + '<span class="preview-chip">' + state.size + '×' + state.size + '</span></div></div>' +
+              '<button class="action red play comic-cta" data-action="daily"><span class="cta-play">▶</span><span>PLAY DAILY PICK</span></button>' +
+              '<div class="home-actions">' +
+                '<button class="action blue comic-nav" data-action="collection"><span class="nav-glyph">▦</span><span>COLLECTIONS</span></button>' +
+                '<button class="action green comic-nav" data-action="info"><span class="nav-glyph">?</span><span>HOW TO PLAY</span></button>' +
+              '</div>' +
+              '<div class="home-secondary single"><button class="action salmon comic-learn" data-action="help"><span>★</span><span>LEARN THE 4×4</span><span class="chev">›</span></button></div>' +
+            '</section>');
+          }"""
+          s = re.sub(r"  function renderHome\(\) \{.*?\n  \}\n\n  function collectionProgress", home + "\n\n  function collectionProgress", s, count=1, flags=re.S)
+
+          app.write_text(s)
+
+          sw = Path('web/sw.js')
+          if sw.exists():
+              x = sw.read_text()
+              x = x.replace("slide-tales-shell-v5", "slide-tales-shell-v6")
+              x = x.replace("slide-tales-shell-v4", "slide-tales-shell-v6")
+              if "./assets/ui/retro-slide-tales-logo.webp" not in x:
+                  x = x.replace("const SHELL=['./','./index.html','./styles.css','./app.js'];",
+                                "const SHELL=['./','./index.html','./styles.css','./app.js','./assets/ui/retro-slide-tales-logo.webp'];")
+              sw.write_text(x)
+          PY
+
+          cat >> web/styles.css <<'CSS'
+
+          /* Comic asset UI v3 */
+          .comic-topbar {
+            min-height:94px;
+            grid-template-columns:48px minmax(0,1fr) 58px;
+            align-items:center;
+            padding:calc(8px + env(safe-area-inset-top)) 13px 4px;
+            overflow:visible;
+          }
+          .brand-lockup {
+            display:grid;
+            place-items:center;
+            min-width:0;
+            height:78px;
+            margin:-2px 2px 0;
+            pointer-events:none;
+          }
+          .brand-logo {
+            display:block;
+            width:min(100%,250px);
+            max-height:78px;
+            object-fit:contain;
+            filter:drop-shadow(0 2px 0 rgba(23,23,24,.85)) drop-shadow(0 5px 0 rgba(46,156,221,.28));
+            transform:rotate(-1.2deg);
+            animation:brandPop .34s var(--ease-pop) both;
+          }
+          @keyframes brandPop {
+            from { opacity:0; transform:translateY(-6px) scale(.94) rotate(-2deg); }
+            to { opacity:1; transform:translateY(0) scale(1) rotate(-1.2deg); }
+          }
+
+          .comic-help {
+            width:44px;
+            height:44px;
+            border:3px solid var(--ink);
+            background:
+              radial-gradient(circle at 28% 22%,rgba(255,255,255,.82) 0 9%,transparent 10%),
+              radial-gradient(circle at 70% 70%,rgba(0,78,163,.22) 0 2px,transparent 2.2px),
+              linear-gradient(145deg,#bfe6f5,#73c6e7 64%,#4aa5cf);
+            background-size:auto,7px 7px,auto;
+            box-shadow:0 4px 0 var(--ink),3px 5px 0 #2c9bdd;
+            color:var(--cream);
+            text-shadow:0 2px 0 var(--ink);
+          }
+          .comic-help span {
+            display:block;
+            font-family:"Arial Black",Impact,sans-serif;
+            font-size:22px;
+            line-height:1;
+            -webkit-text-stroke:1.4px var(--ink);
+          }
+          .comic-score {
+            min-width:56px;
+            height:39px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:5px;
+            border:3px solid var(--ink);
+            border-radius:13px;
+            background:
+              radial-gradient(circle at 20% 20%,rgba(255,255,255,.7),transparent 28%),
+              radial-gradient(circle at 75% 70%,rgba(220,169,44,.18) 0 1.5px,transparent 1.8px),
+              linear-gradient(145deg,#fff3c9,#f6e3a4);
+            background-size:auto,6px 6px,auto;
+            box-shadow:0 4px 0 var(--ink),3px 5px 0 #2d9dde;
+          }
+          .comic-score span { color:#f5bf29; font-size:16px; -webkit-text-stroke:1.5px var(--ink); }
+          .comic-score b { font-family:"Arial Black",Impact,sans-serif; font-size:15px; }
+
+          .comic-home { padding-top:0; }
+          .comic-tagline { margin:0 0 8px; }
+          .comic-tagline .hero-copy {
+            font-size:15px;
+            letter-spacing:1.15px;
+            text-shadow:0 1px 0 rgba(255,255,255,.35);
+          }
+          .comic-tagline .hero-sub { margin-top:3px; font-size:8px; opacity:.72; }
+
+          .level-selector { gap:9px; margin-bottom:4px; }
+          .level-button {
+            position:relative;
+            overflow:hidden;
+            min-height:64px;
+            border:3px solid var(--ink);
+            border-radius:15px;
+            background:
+              radial-gradient(circle at 12% 12%,rgba(255,255,255,.58),transparent 25%),
+              radial-gradient(circle at 86% 75%,rgba(23,23,24,.09) 0 1.5px,transparent 1.8px),
+              linear-gradient(145deg,#fff0bd,#f7e6b1);
+            background-size:auto,7px 7px,auto;
+            box-shadow:0 4px 0 var(--ink),3px 5px 0 rgba(46,156,221,.76);
+          }
+          .level-button::after {
+            content:"";
+            position:absolute;
+            left:10px; right:10px; top:5px;
+            height:3px;
+            border-radius:99px;
+            background:rgba(255,255,255,.72);
+          }
+          .level-button.active {
+            background:
+              radial-gradient(circle at 12% 12%,rgba(255,255,255,.6),transparent 25%),
+              radial-gradient(circle at 86% 75%,rgba(14,91,128,.15) 0 1.5px,transparent 1.8px),
+              linear-gradient(145deg,#c2e7f5,#83cce7);
+            background-size:auto,7px 7px,auto;
+            box-shadow:0 3px 0 var(--ink),2px 4px 0 #2d9dde;
+          }
+          .level-button strong {
+            font-size:24px;
+            letter-spacing:.3px;
+            -webkit-text-stroke:.4px var(--ink);
+            text-shadow:1px 2px 0 rgba(255,255,255,.45);
+          }
+          .level-button span { font-size:8px; letter-spacing:.5px; }
+          .level-button small { font-size:7px; opacity:.8; }
+
+          .daily-stage { position:relative; width:max-content; max-width:100%; margin:11px auto 9px; }
+          .daily-ribbon {
+            position:absolute;
+            z-index:5;
+            top:-6px;
+            left:14px;
+            padding:5px 9px 4px;
+            border:2px solid var(--ink);
+            border-radius:9px;
+            background:var(--cream);
+            color:var(--ink);
+            font-family:"Arial Black",Impact,sans-serif;
+            font-size:7px;
+            letter-spacing:.6px;
+            transform:rotate(-2deg);
+            box-shadow:0 2px 0 var(--ink),2px 3px 0 #2d9dde;
+          }
+          .daily-stage .preview { margin:0; }
+          .preview {
+            position:relative;
+            padding:7px;
+            border:3px solid var(--ink);
+            background:linear-gradient(145deg,#fff2cc,#f3d981);
+            box-shadow:0 5px 0 var(--ink),4px 7px 0 #2d9dde,0 15px 28px rgba(90,55,10,.15);
+          }
+          .preview::before { display:none !important; }
+          .preview::after {
+            content:"";
+            position:absolute;
+            z-index:3;
+            inset:7px;
+            pointer-events:none;
+            border-radius:10px;
+            background:linear-gradient(115deg,rgba(255,255,255,.20),transparent 23%,transparent 72%,rgba(255,255,255,.08));
+            mix-blend-mode:screen;
+          }
+          .preview-chip {
+            z-index:6;
+            border:2px solid var(--ink);
+            background:#ffe46f;
+            box-shadow:0 2px 0 var(--ink);
+            font-family:"Arial Black",Impact,sans-serif;
+          }
+
+          .action {
+            position:relative;
+            overflow:hidden;
+            border:3px solid var(--ink);
+            box-shadow:0 4px 0 var(--ink),3px 5px 0 #2d9dde;
+          }
+          .action::before {
+            content:"";
+            position:absolute;
+            left:10px; right:10px; top:5px;
+            height:3px;
+            border-radius:99px;
+            background:rgba(255,255,255,.42);
+            pointer-events:none;
+          }
+          .comic-cta {
+            min-height:58px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            gap:9px;
+            background:
+              radial-gradient(circle at 80% 70%,rgba(112,21,16,.16) 0 1.5px,transparent 1.8px),
+              linear-gradient(145deg,#ef6d60,#d94f45 68%,#c63e35);
+            background-size:7px 7px,auto;
+            color:var(--cream);
+            font-family:"Arial Black",Impact,sans-serif;
+            font-size:17px;
+            letter-spacing:.45px;
+            text-shadow:0 2px 0 rgba(0,0,0,.35);
+          }
+          .cta-play {
+            width:28px; height:28px;
+            display:grid; place-items:center;
+            border:2px solid var(--ink);
+            border-radius:50%;
+            background:var(--cream);
+            color:var(--red);
+            text-shadow:none;
+            box-shadow:0 2px 0 var(--ink);
+            font-size:12px;
+            padding-left:2px;
+          }
+          .home-actions { gap:9px; margin-top:10px; }
+          .comic-nav {
+            min-height:60px !important;
+            display:grid;
+            grid-template-columns:34px 1fr;
+            align-items:center;
+            gap:6px;
+            padding:7px 12px;
+            color:var(--cream);
+            font-family:"Arial Black",Impact,sans-serif;
+            font-size:11px !important;
+            letter-spacing:.3px;
+            text-shadow:0 2px 0 rgba(0,0,0,.24);
+          }
+          .comic-nav.blue {
+            background:
+              radial-gradient(circle at 80% 70%,rgba(25,101,145,.13) 0 1.5px,transparent 1.8px),
+              linear-gradient(145deg,#b9e2f2,#72c1df);
+            background-size:7px 7px,auto;
+          }
+          .comic-nav.green {
+            background:
+              radial-gradient(circle at 80% 70%,rgba(17,91,48,.12) 0 1.5px,transparent 1.8px),
+              linear-gradient(145deg,#95d1a4,#67ae79);
+            background-size:7px 7px,auto;
+          }
+          .nav-glyph {
+            width:30px;height:30px;
+            display:grid;place-items:center;
+            border:2px solid var(--ink);
+            border-radius:8px;
+            background:var(--cream);
+            color:var(--ink);
+            text-shadow:none;
+            box-shadow:0 2px 0 var(--ink);
+            font-size:16px;
+          }
+          .comic-learn {
+            min-height:48px !important;
+            display:grid;
+            grid-template-columns:24px 1fr 20px;
+            align-items:center;
+            padding-inline:13px;
+            background:
+              radial-gradient(circle at 85% 65%,rgba(130,52,45,.12) 0 1.5px,transparent 1.8px),
+              linear-gradient(145deg,#f3a093,#e77e6d);
+            background-size:7px 7px,auto;
+            color:var(--cream);
+            font-family:"Arial Black",Impact,sans-serif;
+            font-size:10px !important;
+            letter-spacing:.35px;
+            text-shadow:0 2px 0 rgba(0,0,0,.22);
+          }
+          .comic-learn .chev { font-size:23px; line-height:1; }
+
+          .title-row h1 {
+            letter-spacing:.4px;
+            text-shadow:2px 2px 0 var(--cream),3px 3px 0 rgba(46,156,221,.68);
+          }
+          .back {
+            border:3px solid var(--ink);
+            background:linear-gradient(145deg,#fff4cf,#efd98e);
+            box-shadow:0 3px 0 var(--ink),2px 4px 0 #2d9dde;
+          }
+
+          .collection-tab {
+            border:2.5px solid var(--ink);
+            background:
+              radial-gradient(circle at 80% 75%,rgba(23,23,24,.07) 0 1.4px,transparent 1.7px),
+              linear-gradient(145deg,#fff3cf,#f1ddb0);
+            background-size:6px 6px,auto;
+            box-shadow:0 3px 0 var(--ink),2px 4px 0 rgba(46,156,221,.62);
+          }
+          .collection-tab.active {
+            background:linear-gradient(145deg,var(--ink),#2d2b2b);
+            color:var(--yellow2);
+            box-shadow:0 3px 0 var(--ink),2px 4px 0 #2d9dde;
+          }
+          .collection-summary {
+            border:2px solid var(--ink);
+            background:linear-gradient(145deg,#202022,#101011);
+            box-shadow:0 3px 0 var(--ink),2px 4px 0 rgba(46,156,221,.5);
+          }
+          .card {
+            border:3px solid var(--ink);
+            background:
+              radial-gradient(circle at 88% 85%,rgba(209,167,72,.12) 0 1.4px,transparent 1.7px),
+              linear-gradient(155deg,#fff2cf,#f3e2bb);
+            background-size:6px 6px,auto;
+            box-shadow:0 4px 0 var(--ink),3px 5px 0 rgba(46,156,221,.62);
+          }
+          .card-art { border:2px solid var(--ink); overflow:hidden; }
+          .card-chip { background:#ec8c7b; box-shadow:0 1px 0 var(--ink); }
+          .grid-chip { background:#ffe26a; box-shadow:0 1px 0 var(--ink); }
+
+          .board-frame {
+            border:3px solid var(--ink);
+            background:linear-gradient(145deg,#fff2ce,#efd99b);
+            box-shadow:0 5px 0 var(--ink),4px 7px 0 #2d9dde,0 16px 30px rgba(68,42,10,.15);
+          }
+          .control {
+            border:3px solid var(--ink);
+            box-shadow:0 3px 0 var(--ink),2px 4px 0 rgba(46,156,221,.68);
+          }
+          .game-help,.progress {
+            border:2px solid var(--ink);
+            border-radius:11px;
+            box-shadow:0 2px 0 var(--ink),2px 3px 0 rgba(46,156,221,.45);
+          }
+
+          .info-screen .rule-card,
+          .help-card {
+            border:3px solid var(--ink);
+            box-shadow:0 3px 0 var(--ink),2px 4px 0 rgba(46,156,221,.52);
+          }
+          .rule-tools span {
+            border:2px solid var(--ink);
+            background:rgba(255,246,218,.78);
+            box-shadow:0 2px 0 var(--ink);
+          }
+          .overlay {
+            border:3px solid var(--ink);
+            border-radius:18px;
+            background:
+              radial-gradient(circle at 88% 85%,rgba(219,174,72,.10) 0 1.5px,transparent 1.8px),
+              linear-gradient(155deg,#fff1ca,#f4e0ae);
+            background-size:7px 7px,auto;
+            color:var(--ink);
+            box-shadow:inset 0 0 0 2px rgba(255,255,255,.35),4px 6px 0 #2d9dde;
+          }
+          .overlay h2,.overlay p { color:var(--ink); }
+          .quick-step {
+            border:2px solid var(--ink);
+            background:rgba(255,255,255,.42);
+            color:var(--ink);
+            box-shadow:0 2px 0 var(--ink);
+          }
+          .quick-step strong { color:#136d9a; }
+          .quick-step span { color:var(--ink); }
+          .guide-kicker { border-color:var(--ink); color:var(--ink); background:#ffe26a; }
+          .guide-tip { border:2px solid var(--ink); box-shadow:0 2px 0 var(--ink); }
+
+          @media (max-width:390px) {
+            .comic-topbar { min-height:88px; grid-template-columns:44px minmax(0,1fr) 54px; padding-inline:9px; }
+            .brand-lockup { height:70px; }
+            .brand-logo { width:min(100%,225px); max-height:70px; }
+            .comic-help { width:41px;height:41px; }
+            .comic-score { min-width:52px;height:37px; }
+            .comic-tagline .hero-copy { font-size:14px; }
+            .comic-cta { min-height:55px; font-size:15px; }
+            .comic-nav { min-height:56px !important; font-size:10px !important; }
+          }
+          @media (prefers-reduced-motion:reduce) {
+            .brand-logo { animation:none !important; }
+          }
+          CSS
+
+          node --check web/app.js
+          test -s web/assets/ui/retro-slide-tales-logo.webp
+          grep -q 'class="brand-logo"' web/app.js
+          grep -q 'PLAY DAILY PICK' web/app.js
+
       - name: Install asset tools
         run: |
           sudo apt-get update
@@ -1051,4 +1471,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..6p_VLN1v02kPVWJl.-jVvZBjr5i5B0GYm1qlodhNv7Zy22_tEMR4idk0Db0bcht7J7KTH241WGBI9G4wSWW0FrrV-kgBUMWUqJY9VL0ehIRM1WJH30zIr_yTngQ9eIbMh86YTAeCQa7XtxTmU4viJnLug066FOjtulIzG4BiCMtn4lTYqoaWiol1fh-LwYjWc34zL_OLfLjsIi10wmXsAbbP-HWqWd__OYzblxTm8Ww14dd1Iwn_TNX4bjeE4pfF-bnLyEdJqqerjIkpeSHgIoSsUsFSdODJJk06eosQFIiQkP3X7hsISyBUzuYqp54TR0GrkNICUYMDSQGBfedTw8F17WUtpN2wdJ77No7HrCxwlMyVt63yw89Op4lJ1Ok3mUM4hLTHqI7PxMDFi34VgxezN.Y9VsPPnBoFHvhq1OHAh4qQ" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..06W5zWbDd1Hj5Tng.Z9rgJxmxnxKJ2wFNf9MAy7LduVR1NTHj54R-HmSbjOvNiLonXdJ_6VkbFMGb3kiX-i0h63XT6XF_XVt7CbzToiW36L8DCk1icYxepqUf2TaHruW_NMhahcXt8pmtfEvQdguEGd4knTkpydmZbj0J82pwxHJwXLcufX3GGpLUcvN0cNtDk3rJ30OqyumBbGiyegaudyvSZ0IBsdrS9UnQcKud2F_YSEiYB6a7nS4mEyjLAcIAisXIa7LPzHhl8sZoviz2G9CipuzRNVi6Wdu4u_CYZyXWjkLspu9c5FmN4BGqN51TD-0_kFWKR_fjirhiyT7ZTbPwx_dXglFAuyw0W1Z4pPe-T8eh4q7y07CNWiRTZOEImyUFvsaxo2TcyrAJBDdPj8jV.K98SX6jtYaa64qiz69Lxdw" --no-wait
