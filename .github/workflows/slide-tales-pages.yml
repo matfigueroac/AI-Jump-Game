@@ -1,0 +1,109 @@
+name: Deploy Slide Tales Web
+
+on:
+  push:
+    branches:
+      - slide-tales-android-build
+    paths:
+      - '.github/workflows/slide-tales-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare web source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p web
+          mkdir -p /tmp/slidetales-src
+          tar -xzf slide-tales-src.tgz -C /tmp/slidetales-src
+          cp -R /tmp/slidetales-src/app/src/main/assets/www/. web/
+
+      - name: Install asset tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unar webp
+
+      - name: Build optimized static assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://retro-slide-y74fj6.v2.appdeploy.ai/resources'
+          PUZZLES='web/assets/puzzles'
+          THUMBS='web/assets/thumbs'
+          mkdir -p "$PUZZLES" "$THUMBS" /tmp/packs
+
+          convert_one() {
+            cwebp -quiet -q 82 -resize 768 768 "$1" -o "$PUZZLES/$2.webp"
+            cwebp -quiet -q 72 -resize 240 240 "$1" -o "$THUMBS/$2.webp"
+          }
+
+          declare -A O=(
+            [hero]='puzzle-1.png' [monster]='puzzle-2.png' [rocket]='puzzle-3.png'
+            [tiger]='new-tiger.png' [pirate]='new-pirate.png' [robot]='new-robot.png'
+            [pharaoh]='new-pharaoh.png' [trex]='new-trex.png' [neon]='new-neon-car.png'
+            [submarine]='new-submarine.png' [dragon]='new-dragon.png'
+            [astronaut]='new-astronaut.png' [polar]='new-polar.png'
+          )
+
+          for id in "${!O[@]}"; do
+            f="/tmp/packs/${O[$id]}"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/${O[$id]}" -o "$f"
+            convert_one "$f" "$id"
+          done
+
+          pack() {
+            remote="$1"
+            prefix="$2"
+            rar="/tmp/packs/$prefix.rar"
+            dir="/tmp/packs/$prefix"
+            mkdir -p "$dir"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/$remote" -o "$rar"
+            unar -q -f -o "$dir" "$rar" >/dev/null
+            mapfile -d '' files < <(find "$dir" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print0 | sort -zV)
+            test "${#files[@]}" -eq 10
+            for i in "${!files[@]}"; do
+              n=$((i+1))
+              id=$(printf '%s-%02d' "$prefix" "$n")
+              convert_one "${files[$i]}" "$id"
+            done
+          }
+
+          pack 'japan-sildes.rar' japan
+          pack 'lord-of-rings-slides.rar' fantasy
+          pack 'horror-slides.rar' horror
+
+          touch web/.nojekyll
+          test "$(find "$PUZZLES" -name '*.webp' | wc -l)" -eq 43
+          test "$(find "$THUMBS" -name '*.webp' | wc -l)" -eq 43
+          du -sh web
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
