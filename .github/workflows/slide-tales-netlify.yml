@@ -570,7 +570,7 @@ jobs:
             else setTimeout(run, 120);
           }
 
-"""
+          """
           if "function boardImageSrc(id)" not in s:
             marker = "  function tileMarkup(value, index) {"
             if marker not in s:
@@ -629,7 +629,7 @@ jobs:
             if (card) preloadPuzzle(card.dataset.id);
           }, { passive: true });
 
-"""
+          """
             marker = "  document.addEventListener('click', event => {"
             if marker not in s:
               raise SystemExit("click listener marker missing")
@@ -719,4 +719,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..WHlStO3ncu-q6-4Y.fHD5OI0SRPACcBjfK03E4kcM83-FsuLg6yEGYAVol5vvKNh3QzcrqIZn8hhwl4M41xfi8lFDTiMi2R5vSgGe5slRT1YkiT6xdsOKq1RMxuCwJnzr8Smv8GmYxdrWyd0n7C-ItlHt1NfG44SIhKbTOcVRsmOKdctS0M6CxyZ5RFMaM6juEwdrtuGRyIMlwp2frvK8Oivi0YRI_WjXLgxcyFk9rIgNSX8BZOfe5JNsahrZ3GRrqhWwN6xxUOsTMIbMvLyNyp84WOe_SoIA92J7ibhZwPSlllReimDLCBr2zLpU3ywrbtO7jMxMHkyl3hWgV_uVtQLDsmq3V90vFkSud6unYGV1ea6O7XhvLcCPvnJOJLrvY8H_2t_zRIyHeUJln5klhxZv.in6LkyDZ0ijo-nb5NRAgwA" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..-rZh99Edm91s7fRu.oVYlKD-X-8VjnvtpEDsqHFXcJtAJvvodSID08l_1PicOKqbKnFnauFPwBZW4YaND_rJdQltXbLtDhKz-nkv5smHLMBr2z5LiaMC3EfkItbEZS_9AxByLEcbcf2IdWx62m_qe6fy3pUvVKV6CwzcVTe1qVEcx0k8uqQjHxwBmhegGFLB1ZecsnTfaFPxJblGfEhXAGl9L2yeoO_Z7WlQZk1eF0iWIQ1ojXJgzl1isp5tOAfyHqVuKcy7xkvODnnwju8LtuNZcqb3n8CGuYiMVBCsWP5csGgCQ4TIwxiVeWJ1BN1IlGAADo024RCN9UpqyRcOYlKTAenqzgaz9lKyfmAedLhIoepG0LMrHHIrWAO4kEilyNpN9cR5AeMBBvWQ00Xuj7Bpy.IdpaGCxpSfOnuyVpSFdK2w" --no-wait
