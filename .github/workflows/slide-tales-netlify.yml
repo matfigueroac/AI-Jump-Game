@@ -1,0 +1,89 @@
+name: Deploy Slide Tales to Netlify
+
+on:
+  push:
+    branches:
+      - slide-tales-android-build
+    paths:
+      - '.github/workflows/slide-tales-netlify.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare web source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p web
+          mkdir -p /tmp/slidetales-src
+          tar -xzf slide-tales-src.tgz -C /tmp/slidetales-src
+          cp -R /tmp/slidetales-src/app/src/main/assets/www/. web/
+
+      - name: Install asset tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unar webp
+
+      - name: Build optimized static assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://retro-slide-y74fj6.v2.appdeploy.ai/resources'
+          PUZZLES='web/assets/puzzles'
+          THUMBS='web/assets/thumbs'
+          mkdir -p "$PUZZLES" "$THUMBS" /tmp/packs
+
+          convert_one() {
+            cwebp -quiet -q 82 -resize 768 768 "$1" -o "$PUZZLES/$2.webp"
+            cwebp -quiet -q 72 -resize 240 240 "$1" -o "$THUMBS/$2.webp"
+          }
+
+          declare -A O=(
+            [hero]='puzzle-1.png' [monster]='puzzle-2.png' [rocket]='puzzle-3.png'
+            [tiger]='new-tiger.png' [pirate]='new-pirate.png' [robot]='new-robot.png'
+            [pharaoh]='new-pharaoh.png' [trex]='new-trex.png' [neon]='new-neon-car.png'
+            [submarine]='new-submarine.png' [dragon]='new-dragon.png'
+            [astronaut]='new-astronaut.png' [polar]='new-polar.png'
+          )
+
+          for id in "${!O[@]}"; do
+            f="/tmp/packs/${O[$id]}"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/${O[$id]}" -o "$f"
+            convert_one "$f" "$id"
+          done
+
+          pack() {
+            remote="$1"
+            prefix="$2"
+            rar="/tmp/packs/$prefix.rar"
+            dir="/tmp/packs/$prefix"
+            mkdir -p "$dir"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/$remote" -o "$rar"
+            unar -q -f -o "$dir" "$rar" >/dev/null
+            mapfile -d '' files < <(find "$dir" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print0 | sort -zV)
+            test "${#files[@]}" -eq 10
+            for i in "${!files[@]}"; do
+              n=$((i+1))
+              id=$(printf '%s-%02d' "$prefix" "$n")
+              convert_one "${files[$i]}" "$id"
+            done
+          }
+
+          pack 'japan-sildes.rar' japan
+          pack 'lord-of-rings-slides.rar' fantasy
+          pack 'horror-slides.rar' horror
+          test "$(find "$PUZZLES" -name '*.webp' | wc -l)" -eq 43
+          test "$(find "$THUMBS" -name '*.webp' | wc -l)" -eq 43
+
+      - name: Deploy static site to Netlify
+        working-directory: web
+        run: |
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..sOfd_nNLsyrRWMKY.Qu-1SIqOdOxlUlXtGwn6w3ko4wGiq-xExJLqA7yrZgv3cJZTQAVXoN2U8tKsPXFJYKJLBtF35wwPgSfY8hwyMv7dqGidyBXp4Z_Xnucv1fCEHtHwQvmUh7eU7Sl1eYPXforKSANbFNydd3Oy5IwqZZZ2Px_cUCiVSStgu30SSO4ppB2iujjmvpamfOyrEyxzv99MkTtXidRP7juCw0jzyrO2pjVVGHPyfrdtUnBfBlo7m0RLnf8WCZe6o1ae4dhbQlxli7Fp_mYNui7F4RtYtOoV4neYIwlze8u0gD2br4jOAMB3vGW76amJc2b6TZbsPJ1GsCDFew3WSVQHq6SaVOPs3QmmXXSJzTHI8mzcZeBmXfcAAEbYUU9YsbuDAcQutY1J9av2.sp99rWQLvvRuAA8nt0hUaQ" --no-wait
