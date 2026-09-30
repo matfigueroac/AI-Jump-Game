@@ -1,0 +1,207 @@
+name: Build Slide Tales Android Release
+
+on:
+  push:
+    branches: [slide-tales-android-build]
+    paths:
+      - '.github/workflows/slide-tales-android-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Android source
+        run: |
+          set -euo pipefail
+          mkdir -p slide-tales-android
+          tar -xzf slide-tales-src.tgz -C slide-tales-android
+
+      - name: Install asset tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unar webp
+
+      - name: Build optimized offline assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://retro-slide-y74fj6.v2.appdeploy.ai/resources'
+          WWW='slide-tales-android/app/src/main/assets/www'
+          PUZZLES="$WWW/assets/puzzles"
+          THUMBS="$WWW/assets/thumbs"
+          mkdir -p "$PUZZLES" "$THUMBS" /tmp/packs
+
+          convert_one() {
+            cwebp -quiet -q 82 -resize 768 768 "$1" -o "$PUZZLES/$2.webp"
+            cwebp -quiet -q 72 -resize 240 240 "$1" -o "$THUMBS/$2.webp"
+          }
+
+          declare -A O=(
+            [hero]='puzzle-1.png' [monster]='puzzle-2.png' [rocket]='puzzle-3.png'
+            [tiger]='new-tiger.png' [pirate]='new-pirate.png' [robot]='new-robot.png'
+            [pharaoh]='new-pharaoh.png' [trex]='new-trex.png' [neon]='new-neon-car.png'
+            [submarine]='new-submarine.png' [dragon]='new-dragon.png'
+            [astronaut]='new-astronaut.png' [polar]='new-polar.png'
+          )
+
+          for id in "${!O[@]}"; do
+            f="/tmp/packs/${O[$id]}"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/${O[$id]}" -o "$f"
+            convert_one "$f" "$id"
+          done
+
+          pack() {
+            remote="$1"; prefix="$2"; rar="/tmp/packs/$prefix.rar"; dir="/tmp/packs/$prefix"
+            mkdir -p "$dir"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/$remote" -o "$rar"
+            unar -q -f -o "$dir" "$rar" >/dev/null
+            mapfile -d '' files < <(find "$dir" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print0 | sort -zV)
+            test "${#files[@]}" -eq 10
+            for i in "${!files[@]}"; do
+              n=$((i+1)); id=$(printf '%s-%02d' "$prefix" "$n")
+              convert_one "${files[$i]}" "$id"
+            done
+          }
+
+          pack 'japan-sildes.rar' japan
+          pack 'lord-of-rings-slides.rar' fantasy
+          pack 'horror-slides.rar' horror
+          test "$(find "$PUZZLES" -name '*.webp' | wc -l)" -eq 43
+          test "$(find "$THUMBS" -name '*.webp' | wc -l)" -eq 43
+
+      - name: Harden release manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          MANIFEST='slide-tales-android/app/src/main/AndroidManifest.xml'
+          sed -i '/android.permission.INTERNET/d' "$MANIFEST"
+          sed -i '/android.permission.ACCESS_NETWORK_STATE/d' "$MANIFEST"
+          sed -i '/android.permission.REQUEST_INSTALL_PACKAGES/d' "$MANIFEST"
+          sed -i '/android.permission.QUERY_ALL_PACKAGES/d' "$MANIFEST"
+          echo 'Release manifest:'
+          cat "$MANIFEST"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v4
+
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Generate release signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          PASS=$(openssl rand -hex 24)
+          echo "$PASS" > slide-tales-android/signing-password.txt
+          keytool -genkeypair -v             -keystore slide-tales-android/app/slidetales-release.jks             -storepass "$PASS"             -keypass "$PASS"             -alias slidetales             -keyalg RSA             -keysize 4096             -validity 10000             -dname "CN=Slide Tales, OU=Games, O=Slide Tales, L=Santiago, ST=RM, C=CL"
+
+          if [ -f slide-tales-android/app/build.gradle ]; then
+            cat >> slide-tales-android/app/build.gradle <<'GRADLE'
+
+android {
+    signingConfigs {
+        release {
+            storeFile file("slidetales-release.jks")
+            storePassword file("../signing-password.txt").text.trim()
+            keyAlias "slidetales"
+            keyPassword file("../signing-password.txt").text.trim()
+        }
+    }
+    buildTypes {
+        release {
+            debuggable false
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+}
+GRADLE
+          elif [ -f slide-tales-android/app/build.gradle.kts ]; then
+            cat >> slide-tales-android/app/build.gradle.kts <<'GRADLEKTS'
+
+android {
+    signingConfigs {
+        create("releaseLocal") {
+            storeFile = file("slidetales-release.jks")
+            storePassword = file("../signing-password.txt").readText().trim()
+            keyAlias = "slidetales"
+            keyPassword = file("../signing-password.txt").readText().trim()
+        }
+    }
+    buildTypes {
+        getByName("release") {
+            isDebuggable = false
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("releaseLocal")
+        }
+    }
+}
+GRADLEKTS
+          else
+            echo "No app Gradle file found" >&2
+            exit 1
+          fi
+
+      - name: Build signed Release APK and AAB
+        working-directory: slide-tales-android
+        run: gradle :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace
+
+      - name: Verify signature and permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find slide-tales-android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
+          echo 'Manifest permission/debug scan:'
+          "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump xmltree "$APK" --file AndroidManifest.xml | grep -E 'permission|debuggable|usesCleartextTraffic' || true
+
+      - name: Prepare deliverables
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=$(find slide-tales-android/app/build/outputs/apk/release -name '*.apk' | head -1)
+          AAB=$(find slide-tales-android/app/build/outputs/bundle/release -name '*.aab' | head -1)
+          cp "$APK" SlideTales-Android-v1.0.1-release.apk
+          cp "$AAB" SlideTales-Android-v1.0.1-release.aab
+          cp slide-tales-android/app/slidetales-release.jks slide-tales-release.jks
+          {
+            echo 'Slide Tales Android signing information'
+            echo 'Alias: slidetales'
+            printf 'Keystore password: '
+            cat slide-tales-android/signing-password.txt
+            echo
+            echo 'IMPORTANT: keep this keystore and password for future updates.'
+          } > SIGNING_INFO.txt
+          sha256sum SlideTales-Android-v1.0.1-release.apk > APK_SHA256.txt
+          ls -lh SlideTales-Android-v1.0.1-release.apk SlideTales-Android-v1.0.1-release.aab
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slide-tales-release
+          path: |
+            SlideTales-Android-v1.0.1-release.apk
+            SlideTales-Android-v1.0.1-release.aab
+            APK_SHA256.txt
+          compression-level: 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slide-tales-signing-key
+          path: |
+            slide-tales-release.jks
+            SIGNING_INFO.txt
+          compression-level: 0
