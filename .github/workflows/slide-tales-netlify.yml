@@ -693,7 +693,7 @@ jobs:
               if (stats[0]) stats[0].textContent = String(state.moves);
             }
 
-"""
+          """
             marker = "  function moveTile(index) {"
             if marker not in s:
               raise SystemExit("moveTile marker missing")
