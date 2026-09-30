@@ -364,6 +364,12 @@ jobs:
           HDR
 
           node --check web/app.js
+          grep -q "function handle(action, element)" web/app.js
+          grep -q "QUICK GUIDE" web/app.js
+          if grep -q "ORIGINAL IMAGE" web/app.js; then
+            echo "Old image-based GUIDE still present" >&2
+            exit 1
+          fi
 
       - name: Force retro logo and internal help menus
         shell: bash
@@ -441,6 +447,74 @@ jobs:
               "    if (state.screen === 'help') {\n      state.screen = state.helpReturn || 'home'; render(); return true;\n    }",
               "    if (state.screen === 'help') {\n      state.screen = state.helpReturn || 'home'; render(); return true;\n    }\n    if (state.screen === 'info') {\n      state.screen = state.helpReturn || 'home'; render(); return true;\n    }"
             )
+
+          # Restore the click router if a previous patch removed it.
+          if "function handle(action, element)" not in s:
+            handle = """  function handle(action, element) {
+              if (action === 'home') {
+                state.screen = 'home'; state.paused = false; state.hint = false; state.guide = false; render(); return;
+              }
+              if (action === 'collection') {
+                state.screen = 'collection'; state.paused = false; state.hint = false; state.guide = false; render(); return;
+              }
+              if (action === 'size') {
+                const size = Number(element.dataset.size);
+                if (size === 3 || size === 4) { state.size = size; savePrefs(); render(); }
+                return;
+              }
+              if (action === 'filter') { updateCollectionFilter(element.dataset.filter || 'all'); return; }
+              if (action === 'play') {
+                const puzzle = PUZZLES.find(p => p.id === element.dataset.id) || PUZZLES[0];
+                startRound(puzzle); return;
+              }
+              if (action === 'daily') { startRound(dailyPuzzle()); return; }
+              if (action === 'tile') { moveTile(Number(element.dataset.index)); return; }
+              if (action === 'shuffle') { startRound(state.current); return; }
+              if (action === 'reset') { resetRound(); return; }
+              if (action === 'replay') { startRound(state.current); return; }
+              if (action === 'hint') { showHint(); return; }
+              if (action === 'guide' && !state.paused && !state.won) { state.guide = true; state.running = false; render(); return; }
+              if (action === 'close-guide') { state.guide = false; render(); return; }
+              if (action === 'pause' && !state.won) { state.paused = true; state.running = false; render(); return; }
+              if (action === 'resume') { state.paused = false; render(); return; }
+              if (action === 'help') {
+                state.helpReturn = state.screen === 'game' ? 'game' : 'home';
+                state.guide = false; state.screen = 'help'; state.running = false; render(); return;
+              }
+              if (action === 'back-from-help') { state.screen = state.helpReturn || 'home'; render(); return; }
+              if (action === 'practice4') { startRound(state.current || PUZZLES[0], 4); return; }
+              if (action === 'info' || action === 'settings') { showHowToPlay(); return; }
+              if (action === 'back-from-info' || action === 'back-from-howto') { state.screen = state.helpReturn || 'home'; render(); return; }
+              if (action === 'dismiss-info') { element.closest('.overlay')?.remove(); return; }
+            }
+
+"""
+            s = s.replace("  document.addEventListener('click', event => {", handle + "  document.addEventListener('click', event => {")
+
+          # GUIDE must show solve instructions, never the original image.
+          guide_block = """    if (state.guide) {
+              const steps = state.size === 4
+                ? [
+                    ['1', 'TOP ROW', 'Place 1–4. Stage the last two as a pair.'],
+                    ['2', 'SECOND ROW', 'Place 5–8, then lock both finished rows.'],
+                    ['3', 'VERTICAL PAIRS', 'Build 9+13, then 10+14 from left to right.'],
+                    ['4', 'FINAL 2×2', 'Cycle 11, 12, 15 and the blank until solved.'],
+                  ]
+                : [
+                    ['1', 'TOP ROW', 'Finish the top row first and stop moving through it.'],
+                    ['2', 'LEFT SIDE', 'Place the next left tile and shrink the active area.'],
+                    ['3', 'FINAL 2×2', 'Rotate the last four spaces until the image closes.'],
+                  ];
+              const items = steps.map(step => '<div class="quick-step"><b>' + step[0] + '</b><div><strong>' + step[1] + '</strong><span>' + step[2] + '</span></div></div>').join('');
+              return '<div class="overlay guide-overlay"><div class="guide-kicker">QUICK GUIDE</div><h2>' + state.size + '×' + state.size + ' SOLVE PATH</h2><div class="quick-guide">' + items + '</div><div class="guide-tip">Keep solved zones locked. Move the blank only inside the active area.</div><div class="overlay-actions"><button class="action blue" data-action="close-guide">BACK</button>' + (state.size === 4 ? '<button class="action salmon" data-action="help">FULL GUIDE</button>' : '') + '</div></div>';
+            }"""
+          s = re.sub(
+            r"    if \(state\.guide\) \{\n\s*return '<div class=\"overlay\"><h2>ORIGINAL IMAGE</h2>.*?\n\s*\}",
+            guide_block,
+            s,
+            count=1,
+            flags=re.S
+          )
 
           # The browser-native alert must never be used in this app.
           s = re.sub(r"\balert\([^;]*\);", "showHowToPlay();", s)
