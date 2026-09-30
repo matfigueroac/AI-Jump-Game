@@ -1,0 +1,24 @@
+name: Export Slide Tales Source
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - slide-tales-android-build
+    paths:
+      - '.github/workflows/export-slide-tales-source.yml'
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract source
+        run: |
+          mkdir -p source
+          tar -xzf slide-tales-src.tgz -C source
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slide-tales-source
+          path: source
+          compression-level: 6
