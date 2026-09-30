@@ -365,6 +365,140 @@ jobs:
 
           node --check web/app.js
 
+      - name: Force retro logo and internal help menus
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('web/app.js')
+          s = p.read_text()
+
+          header = """  function header() {
+            return '<header class="topbar">' +
+              '<button class="icon-btn" data-action="info" aria-label="How to play">?</button>' +
+              '<div class="logo retro-logo"><span class="retro-word">RETRO</span><span class="slide-word">SLIDE TALES</span></div>' +
+              '<div class="star-badge" aria-label="Total stars">★ ' + totalStars() + '</div>' +
+            '</header>';
+          }"""
+          s = re.sub(r"  function header\(\) \{.*?\n  \}", header, s, count=1, flags=re.S)
+
+          info_screen = """  function renderInfo() {
+            return shell('<section class="screen info-screen">' +
+              '<div class="title-row"><button class="back" data-action="back-from-info">←</button><div><h1>HOW TO PLAY</h1><p>Quick rules.</p></div></div>' +
+              '<div class="rules-grid">' +
+                '<article class="rule-card blue"><b>1</b><div><h3>TAP IN LINE</h3><p>Tap a tile in the same row or column as the empty space.</p></div></article>' +
+                '<article class="rule-card salmon"><b>2</b><div><h3>SLIDE THE STRIP</h3><p>Every tile between your choice and the gap moves together.</p></div></article>' +
+                '<article class="rule-card green"><b>3</b><div><h3>SOLVE SMART</h3><p>HINT shows the picture. GUIDE shows the solve path.</p></div></article>' +
+              '</div>' +
+              '<div class="rule-tools"><span><strong>HINT</strong>Picture</span><span><strong>GUIDE</strong>Steps</span><span><strong>MIX</strong>New shuffle</span><span><strong>RESET</strong>Restart</span></div>' +
+              '<button class="action black" data-action="back-from-info">GOT IT</button>' +
+            '</section>');
+          }"""
+          if "function renderInfo()" not in s:
+            s = s.replace("  function render() {", info_screen + "\n\n  function render() {")
+
+          render = """  function render() {
+            if (state.screen === 'home') app.innerHTML = renderHome();
+            else if (state.screen === 'collection') app.innerHTML = renderCollection();
+            else if (state.screen === 'game') app.innerHTML = renderGame();
+            else if (state.screen === 'help') app.innerHTML = renderHelp();
+            else app.innerHTML = renderInfo();
+          }"""
+          s = re.sub(r"  function render\(\) \{.*?\n  \}", render, s, count=1, flags=re.S)
+
+          howto = """  function showHowToPlay() {
+            state.helpReturn = state.screen === 'game' ? 'game' : state.screen === 'collection' ? 'collection' : 'home';
+            state.guide = false;
+            state.hint = false;
+            state.screen = 'info';
+            state.running = false;
+            render();
+          }"""
+          s = re.sub(r"  function showHowToPlay\(\) \{.*?\n  \}", howto, s, count=1, flags=re.S)
+
+          s = s.replace("data-action=\"settings\" aria-label=\"How to play\"", "data-action=\"info\" aria-label=\"How to play\"")
+          s = s.replace("data-action=\"settings\">?<span>HOW TO PLAY</span>", "data-action=\"info\">?<span>HOW TO PLAY</span>")
+          s = s.replace("data-action=\"settings\">⚙ RULES", "data-action=\"info\">? HOW TO PLAY")
+          s = s.replace("data-action=\"settings\">⚙ HOW TO PLAY", "data-action=\"info\">? HOW TO PLAY")
+
+          if "if (action === 'info')" not in s:
+            s = s.replace(
+              "    if (action === 'settings') { showHowToPlay(); return; }",
+              "    if (action === 'info') { showHowToPlay(); return; }\n    if (action === 'back-from-info') { state.screen = state.helpReturn || 'home'; render(); return; }\n    if (action === 'settings') { showHowToPlay(); return; }"
+            )
+          else:
+            if "back-from-info" not in s:
+              s = s.replace(
+                "    if (action === 'info') { showHowToPlay(); return; }",
+                "    if (action === 'info') { showHowToPlay(); return; }\n    if (action === 'back-from-info') { state.screen = state.helpReturn || 'home'; render(); return; }"
+              )
+
+          # Force Android/browser back behavior for the in-app info screen.
+          if "state.screen === 'info'" not in s:
+            s = s.replace(
+              "    if (state.screen === 'help') {\n      state.screen = state.helpReturn || 'home'; render(); return true;\n    }",
+              "    if (state.screen === 'help') {\n      state.screen = state.helpReturn || 'home'; render(); return true;\n    }\n    if (state.screen === 'info') {\n      state.screen = state.helpReturn || 'home'; render(); return true;\n    }"
+            )
+
+          # The browser-native alert must never be used in this app.
+          s = re.sub(r"\balert\([^;]*\);", "showHowToPlay();", s)
+
+          p.write_text(s)
+
+          css = Path('web/styles.css')
+          c = css.read_text()
+          c += """
+          
+          /* Retro comic brand + internal help screen */
+          .retro-logo {
+            line-height:.8;
+            transform:rotate(-2deg);
+            display:grid;
+            place-items:center;
+            align-content:center;
+          }
+          .retro-logo .retro-word {
+            display:block;
+            color:var(--red);
+            font-family:"Arial Black",Impact,system-ui,sans-serif;
+            font-size:clamp(27px,8vw,35px);
+            letter-spacing:-1.5px;
+            -webkit-text-stroke:1.5px var(--ink);
+            text-shadow:2px 2px 0 var(--cream);
+          }
+          .retro-logo .slide-word {
+            display:block;
+            margin-top:2px;
+            color:var(--blue);
+            font-family:"Arial Black",Impact,system-ui,sans-serif;
+            font-size:clamp(15px,4.8vw,21px);
+            letter-spacing:1.4px;
+            -webkit-text-stroke:1.2px var(--ink);
+            text-shadow:1.5px 1.5px 0 var(--cream);
+          }
+          .info-screen { padding-bottom:calc(22px + env(safe-area-inset-bottom)); }
+          .rules-grid { display:grid; gap:9px; margin-top:8px; }
+          .rule-card { display:grid; grid-template-columns:42px 1fr; gap:10px; align-items:center; padding:11px; border:2.5px solid var(--ink); border-radius:14px; box-shadow:0 3px 0 var(--ink); }
+          .rule-card.blue { background:var(--blue); }
+          .rule-card.salmon { background:var(--salmon); }
+          .rule-card.green { background:var(--green); }
+          .rule-card > b { width:38px; height:38px; display:grid; place-items:center; border:2px solid var(--ink); border-radius:50%; background:var(--ink); color:var(--yellow2); font-family:"Arial Black",system-ui,sans-serif; font-size:16px; }
+          .rule-card h3 { margin:0 0 3px; font-family:"Arial Black",system-ui,sans-serif; font-size:12px; }
+          .rule-card p { margin:0; font-size:9px; line-height:1.35; font-weight:750; }
+          .rule-tools { display:grid; grid-template-columns:1fr 1fr; gap:7px; margin:10px 0; }
+          .rule-tools span { padding:9px; border:2px solid var(--ink); border-radius:10px; background:rgba(255,255,255,.46); font-size:8px; font-weight:800; }
+          .rule-tools strong { display:block; margin-bottom:1px; font-size:8px; }
+          """
+          css.write_text(c)
+
+          if "alert(" in s:
+            raise SystemExit("Browser alert still present in app.js")
+          PY
+
+          node --check web/app.js
+
       - name: Install asset tools
         run: |
           sudo apt-get update
