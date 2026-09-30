@@ -6,6 +6,7 @@ on:
       - slide-tales-android-build
     paths:
       - '.github/workflows/slide-tales-netlify.yml'
+      - 'slide-tales-ui/**'
   workflow_dispatch:
 
 permissions:
@@ -991,12 +992,28 @@ jobs:
             exit 1
           fi
 
-      - name: Upload audited web snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: slide-tales-audited-web
-          path: web
-          retention-days: 1
+      - name: Apply Comic Deluxe UI safely
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p web/assets/ui
+          cp slide-tales-ui/retro-slide-tales-logo.webp web/assets/ui/retro-slide-tales-logo.webp
+          python slide-tales-ui/apply-comic-ui.py
+          cat slide-tales-ui/comic-deluxe.css >> web/styles.css
+
+          node --check web/app.js
+          node slide-tales-ui/smoke-ui.js
+          test -s web/assets/ui/retro-slide-tales-logo.webp
+          grep -q 'class="brand-logo"' web/app.js
+          grep -q "PLAY DAILY PICK" web/app.js
+          if grep -q "alert(" web/app.js; then
+            echo "Native browser alert regression" >&2
+            exit 1
+          fi
+          if grep -q "ORIGINAL IMAGE" web/app.js; then
+            echo "Guide image regression" >&2
+            exit 1
+          fi
 
       - name: Install asset tools
         run: |
@@ -1058,4 +1075,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..z1Vja_fTgpOJZTlw.uovw8xE8J5eiVD5FA8OQazUVmlpKtJDz-WXWo6nL4mDJx31bHXLZOjJ_8rzl-TNG-d4etEgswAYaqjiJBLY40W0sPRUkGKeachw--ALNfg-NOh-z1Ufhsp35otq9E0BNFHS_eVEjUtyOEtk_p5w9TWaUo_A-Yir4VyxNb67n1sKtsRdiKRf1IWP2crZkfnDiS8fagPwr5-TScawojkmO_uW9sN8BKM10TSiBxiC_HMcEObMVQS2I3Q8WGJ0Id3spmnC1_wswufXjM61xc8T5D9TBGwn-dCP5D2qpbPYzvbkX7qfDD2LeCixPfKrzjmS0ZTo1oyDTVDh03EqTz9bcMJA0urQpiUcW9HjghRePATT42dDr2hxYnMOmVIei3WZogbfplJI5.wXsjEVEn9KlKm5_0dyl2aw" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..oi-5SGa-vmbklJCp.kL5T60G2GsRLsdThBRctHEqf01SsfjcM9NGISgMh7rX7mG3SglSAE-05j5h1sscgLbnQNfwb0ga-LNho6IKctTVZpmgKOtihU_gj1XQ0NPPiX5mi6vnoFlODIOs7y25QZqFvcJ6BhiB2_FaaVsr1oZPptw6Az6AjPIRUUG6mM7y8_dJFziHGMjWWkvjK4Dn6FvmsZIv4vVeNIsvfBpHuZztn__LkPjwNk9OdhonQuRkYRuyfLnioipHG6tbhReoQbJr_n1A0RWLdbDA5NDnylhkpoed0gaCIuBka6agLCBg48ao8ypBMO_GZ8rUPbPgqgiqhPQ0ozh_hxRLZrKtdqYnXJdP0ZJBp7BEHgMqJahAg38sn71haoreHZ8WoN5mU4UB2EmfJ.BxIT4_BTHTT522o2ta6cNw" --no-wait
