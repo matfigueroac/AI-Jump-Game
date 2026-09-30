@@ -331,8 +331,8 @@ jobs:
           CSS
 
           cat > web/sw.js <<'JS'
-          const SHELL_CACHE='slide-tales-shell-v2';
-          const IMAGE_CACHE='slide-tales-images-v2';
+          const SHELL_CACHE='slide-tales-shell-v3';
+          const IMAGE_CACHE='slide-tales-images-v3';
           const SHELL=['./','./index.html','./styles.css','./app.js'];
           self.addEventListener('install',e=>e.waitUntil(caches.open(SHELL_CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
           self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>![SHELL_CACHE,IMAGE_CACHE].includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
@@ -595,4 +595,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..epQ4CUsjKruAFay0.jqyc_DN1sOqLHgwtDnJxElr3Agy5Nwy2R7b-Am9tOPdT6bfuuM0Rrk2Caf_uEnLG2baOCJ6toe4Ix3724i0uLWrOsHTc0qEZUAK-8EkNUJ2zEKXlX7E9939W6sVVjU-9r0_yhd7ch37QhuBNMpv9Vvhfe0bNSgtPqPtt8Tli9iT8St6MttUsQBfSWkL6ygVoUVeZf_-YuEZSGfj7yO16zPjqme0P132tgtwdDq2FkB19Fow7KpCDGlnlS9T7A_2zF2T-_jQv3kKj9bqfa8YLbvAecoPUAg35V2O1YGFk2QshD-y8rZMXKqFOFPna-i3puZtCAkVJerdG62d6AjLUkc7cy2gHT2T4NhAjLH8peiqj-ZEtVwire4oSn_plIgDP_HURqTRE.IgykcDITDx_CIPAocLNLKQ" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..POmCCQSYzTdt7J10.HmoaM7eM9v4g-Zu4czoACHqujAKnEz7XvjhzHxkw94Hu0lPKRS-e74PBV1z9V0my8iuLapA1H_8pH8jJQQZQ0Fhwmy3cSkMeKb7f068wxnVWVBUXj_frNbkmZ2Jfxh_IXVYN9_hiXhpvpetE5WhiGgMwih3IP3PUZKEOSIbPfQ5XQ7KWcZpZiZk9aq_3fxi_l-w0E-7CGtsmtRh4aAnBck4A8ovLhuZnmrqkAxFIpKUZaOx5uhnTxronhjC_4nYRHxAqrSGgwxe5g6MblpciAzmxHFvu9lFbkg4zrFjh-9rFvHpnDr0Jfau2RBDcBC1Xdx1a-2hgvMsJGjPnwDpmDEeecg1W78y6-DwvFqqw8vkvbbnFlK9f1KE9F-cXnow2ARkNGbQe.lf_lbsp1nfjs1xb3p9Cgbg" --no-wait
