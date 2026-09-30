@@ -1,0 +1,84 @@
+name: Build Slide Tales Android APK
+on:
+  push:
+    branches: [slide-tales-android-build]
+    paths: ['.github/workflows/slide-tales-android.yml','slide-tales-src.tgz']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare source
+        run: |
+          mkdir -p slide-tales-android
+          tar -xzf slide-tales-src.tgz -C slide-tales-android
+      - name: Install image and archive tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unar webp
+      - name: Prepare optimized offline puzzle assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://retro-slide-y74fj6.v2.appdeploy.ai/resources'
+          WWW='slide-tales-android/app/src/main/assets/www'
+          PUZZLES="$WWW/assets/puzzles"
+          THUMBS="$WWW/assets/thumbs"
+          mkdir -p "$PUZZLES" "$THUMBS" /tmp/packs
+          convert_one() {
+            cwebp -quiet -q 82 -resize 768 768 "$1" -o "$PUZZLES/$2.webp"
+            cwebp -quiet -q 72 -resize 240 240 "$1" -o "$THUMBS/$2.webp"
+          }
+          declare -A O=(
+            [hero]='puzzle-1.png' [monster]='puzzle-2.png' [rocket]='puzzle-3.png'
+            [tiger]='new-tiger.png' [pirate]='new-pirate.png' [robot]='new-robot.png'
+            [pharaoh]='new-pharaoh.png' [trex]='new-trex.png' [neon]='new-neon-car.png'
+            [submarine]='new-submarine.png' [dragon]='new-dragon.png'
+            [astronaut]='new-astronaut.png' [polar]='new-polar.png'
+          )
+          for id in "${!O[@]}"; do
+            f="/tmp/packs/${O[$id]}"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/${O[$id]}" -o "$f"
+            convert_one "$f" "$id"
+          done
+          pack() {
+            remote="$1"; prefix="$2"; rar="/tmp/packs/$prefix.rar"; dir="/tmp/packs/$prefix"
+            mkdir -p "$dir"
+            curl --retry 4 --retry-delay 2 -fsSL "$BASE/$remote" -o "$rar"
+            unar -q -f -o "$dir" "$rar" >/dev/null
+            mapfile -d '' files < <(find "$dir" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print0 | sort -zV)
+            test "${#files[@]}" -eq 10
+            for i in "${!files[@]}"; do
+              n=$((i+1)); id=$(printf '%s-%02d' "$prefix" "$n")
+              convert_one "${files[$i]}" "$id"
+            done
+          }
+          pack 'japan-sildes.rar' japan
+          pack 'lord-of-rings-slides.rar' fantasy
+          pack 'horror-slides.rar' horror
+          test "$(find "$PUZZLES" -name '*.webp' | wc -l)" -eq 43
+          test "$(find "$THUMBS" -name '*.webp' | wc -l)" -eq 43
+          du -sh "$WWW/assets"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Build APK
+        working-directory: slide-tales-android
+        run: gradle :app:assembleDebug --no-daemon
+      - name: Prepare final APK
+        run: cp slide-tales-android/app/build/outputs/apk/debug/app-debug.apk SlideTales-Android-v1.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: slide-tales-apk
+          path: SlideTales-Android-v1.apk
+          compression-level: 0
