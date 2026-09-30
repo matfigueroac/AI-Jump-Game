@@ -22,10 +22,305 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p web
-          mkdir -p /tmp/slidetales-src
+          rm -rf web /tmp/slidetales-src
+          mkdir -p web /tmp/slidetales-src
           tar -xzf slide-tales-src.tgz -C /tmp/slidetales-src
           cp -R /tmp/slidetales-src/app/src/main/assets/www/. web/
+
+      - name: Apply mobile UI v2
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('web/app.js')
+          s = p.read_text()
+
+          s = s.replace("{ id: 'japan', label: 'SAMURAI & JAPAN', count: 10 }", "{ id: 'japan', label: 'JAPAN', count: 10 }")
+          s = s.replace("{ id: 'fantasy', label: 'EPIC FANTASY', count: 10 }", "{ id: 'fantasy', label: 'FANTASY', count: 10 }")
+          s = s.replace("{ id: 'horror', label: 'RETRO HORROR', count: 10 }", "{ id: 'horror', label: 'HORROR', count: 10 }")
+          s = s.replace("  const app = document.getElementById('app');", "  const ASSET_VERSION = 'ui-2026-09-30-2';\n  const warmedImages = new Set();\n\n  const app = document.getElementById('app');")
+          s = s.replace("  function puzzleSrc(id) { return './assets/puzzles/' + id + '.webp'; }\n  function thumbSrc(id) { return './assets/thumbs/' + id + '.webp'; }", "  function puzzleSrc(id) { return './assets/puzzles/' + id + '.webp?v=' + ASSET_VERSION; }\n  function thumbSrc(id) { return './assets/thumbs/' + id + '.webp?v=' + ASSET_VERSION; }")
+          s = s.replace("    won: false,\n    records: loadJson(recordsKey, {}),", "    won: false,\n    helpReturn: 'home',\n    records: loadJson(recordsKey, {}),")
+
+          home = '''  function renderHome() {
+            const featured = PUZZLES[Math.floor(Date.now() / 86400000) % PUZZLES.length];
+            return shell('<section class="screen home-screen">' +
+              '<div class="hero-lockup"><p class="hero-copy">PICK · SLIDE · SOLVE</p><p class="hero-sub">Retro comic puzzles made for touch.</p></div>' +
+              levelSelector() +
+              '<div class="preview"><img fetchpriority="high" decoding="async" src="' + puzzleSrc(featured.id) + '" alt="' + featured.title + '">' + previewGrid() + '<span class="preview-chip">' + state.size + '×' + state.size + '</span></div>' +
+              '<button class="action red play" data-action="play" data-id="' + featured.id + '">▶ PLAY DAILY PICK</button>' +
+              '<div class="home-actions">' +
+                '<button class="action blue" data-action="collection">▦<span>COLLECTIONS</span></button>' +
+                '<button class="action green" data-action="daily">★<span>DAILY</span></button>' +
+              '</div>' +
+              '<div class="home-secondary">' +
+                '<button class="action salmon" data-action="help">? SOLVE 4×4</button>' +
+                '<button class="action black" data-action="settings">⚙ RULES</button>' +
+              '</div>' +
+            '</section>');
+          }'''
+          s = re.sub(r"  function renderHome\(\) \{.*?\n  \}\n\n  function collectionProgress", home + "\n\n  function collectionProgress", s, count=1, flags=re.S)
+
+          collection = '''  function collectionCardsMarkup() {
+            const list = state.filter === 'all' ? PUZZLES : PUZZLES.filter(p => p.collection === state.filter);
+            return list.map(p => {
+              const record = state.records[recordKey(p.id, state.size)];
+              const collectionLabel = COLLECTIONS.find(c => c.id === p.collection)?.label || p.category;
+              return '<button class="card" data-action="play" data-id="' + p.id + '">' +
+                '<div class="card-art"><img loading="lazy" decoding="async" fetchpriority="low" width="192" height="192" src="' + thumbSrc(p.id) + '" alt="' + p.title + '"><span class="card-chip">' + collectionLabel + '</span><span class="grid-chip">' + state.size + '×' + state.size + '</span></div>' +
+                '<strong>' + p.title + '</strong>' +
+                '<div class="card-footer"><div class="card-stars">' + starMarkup(record?.stars || 0) + '</div><small>' + (record ? record.moves + ' moves' : 'NEW') + '</small></div>' +
+              '</button>';
+            }).join('');
+          }
+
+          function collectionTabsMarkup() {
+            return COLLECTIONS.map(c => '<button class="collection-tab ' + (state.filter === c.id ? 'active' : '') + '" data-action="filter" data-filter="' + c.id + '"><strong>' + c.label + '</strong><small>' + c.count + '</small></button>').join('');
+          }
+
+          function renderCollection() {
+            return shell('<section class="screen collection-screen">' +
+              '<div class="title-row"><button class="back" data-action="home">←</button><div><h1>COLLECTIONS</h1><p>Pick a theme.</p></div></div>' +
+              levelSelector() + '<div class="collection-tabs">' + collectionTabsMarkup() + '</div>' +
+              '<div class="collection-summary"><b>' + state.size + '×' + state.size + '</b><span>' + collectionProgress(state.filter) + '</span></div>' +
+              '<div class="cards">' + collectionCardsMarkup() + '</div>' +
+              '<nav class="bottom-nav"><button data-action="home">⌂ HOME</button><button class="active" data-action="collection">▦ COLLECTIONS</button></nav>' +
+            '</section>');
+          }
+
+          function updateCollectionFilter(filter) {
+            state.filter = filter || 'all';
+            savePrefs();
+            warmFilter(state.filter);
+            const tabs = document.querySelector('.collection-tabs');
+            const cards = document.querySelector('.cards');
+            const summary = document.querySelector('.collection-summary span');
+            if (state.screen !== 'collection' || !tabs || !cards || !summary) return render();
+            tabs.innerHTML = collectionTabsMarkup();
+            summary.textContent = collectionProgress(state.filter);
+            cards.classList.add('switching');
+            requestAnimationFrame(() => {
+              cards.innerHTML = collectionCardsMarkup();
+              cards.classList.remove('switching');
+            });
+          }'''
+          s = re.sub(r"  function renderCollection\(\) \{.*?\n  \}\n\n  function tileMarkup", collection + "\n\n  function tileMarkup", s, count=1, flags=re.S)
+
+          old_guide = '''    if (state.guide) {
+              return '<div class="overlay"><h2>ORIGINAL IMAGE</h2><img src="' + puzzleSrc(state.current.id) + '" alt="Original puzzle"><p>The timer is paused while the guide is open.</p><button class="action blue" data-action="close-guide">BACK TO PUZZLE</button></div>';
+            }'''
+          new_guide = '''    if (state.guide) {
+              const steps = state.size === 4
+                ? [
+                    ['1', 'TOP ROW', 'Place 1–4. Stage the last two as a pair.'],
+                    ['2', 'SECOND ROW', 'Place 5–8, then lock both finished rows.'],
+                    ['3', 'VERTICAL PAIRS', 'Build 9+13, then 10+14 from left to right.'],
+                    ['4', 'FINAL 2×2', 'Cycle 11, 12, 15 and the blank until solved.'],
+                  ]
+                : [
+                    ['1', 'TOP ROW', 'Finish the top row first and stop moving through it.'],
+                    ['2', 'LEFT SIDE', 'Place the next left tile and shrink the active area.'],
+                    ['3', 'FINAL 2×2', 'Rotate the last four spaces until the image closes.'],
+                  ];
+              const items = steps.map(step => '<div class="quick-step"><b>' + step[0] + '</b><div><strong>' + step[1] + '</strong><span>' + step[2] + '</span></div></div>').join('');
+              return '<div class="overlay guide-overlay"><div class="guide-kicker">QUICK GUIDE</div><h2>' + state.size + '×' + state.size + ' SOLVE PATH</h2><div class="quick-guide">' + items + '</div><div class="guide-tip">Keep solved zones locked. Move the blank only inside the active area.</div><div class="overlay-actions"><button class="action blue" data-action="close-guide">BACK</button>' + (state.size === 4 ? '<button class="action salmon" data-action="help">FULL GUIDE</button>' : '') + '</div></div>';
+            }'''
+          s = s.replace(old_guide, new_guide)
+
+          s = s.replace('↝<span>SHUFFLE</span>', '↝<span>MIX</span>')
+          s = s.replace('◉<span>GUIDE</span>', '☰<span>GUIDE</span>')
+          s = s.replace('? HOW TO SOLVE THE 4x4', '? FULL 4×4 GUIDE')
+          s = s.replace('<h1>SOLVE 4x4</h1><p>Layer + Pairs technique, made visual.</p>', '<h1>SOLVE 4×4</h1><p>Layer + Pairs.</p>')
+          s = s.replace('<div class="help-intro"><h2>Think in locked zones</h2><p>Solve a band, stop moving through it, and keep shrinking the active area. Use the blank space as the tool that rotates pieces into position.</p></div>', '<div class="help-intro"><h2>Lock what you solve</h2><p>Finish one zone, stop moving through it, then shrink the active area.</p></div>')
+
+          preload = '''  function preloadImage(src, priority = 'low') {
+            if (warmedImages.has(src)) return Promise.resolve();
+            return new Promise(resolve => {
+              const image = new Image();
+              image.decoding = 'async';
+              try { image.fetchPriority = priority; } catch (_) {}
+              const done = () => {
+                warmedImages.add(src);
+                if (image.decode) image.decode().catch(() => {}).finally(resolve);
+                else resolve();
+              };
+              image.onload = done;
+              image.onerror = resolve;
+              image.src = src;
+              if (image.complete) done();
+            });
+          }
+
+          function preloadPuzzle(id) {
+            return preloadImage(puzzleSrc(id), 'high');
+          }
+
+          function filterPuzzles(filter) {
+            return filter === 'all' ? PUZZLES : PUZZLES.filter(p => p.collection === filter);
+          }
+
+          function warmFilter(filter) {
+            const items = filterPuzzles(filter);
+            const run = async () => {
+              for (let i = 0; i < items.length; i += 4) {
+                await Promise.all(items.slice(i, i + 4).map(p => preloadImage(thumbSrc(p.id))));
+                await new Promise(resolve => setTimeout(resolve, 24));
+              }
+            };
+            if ('requestIdleCallback' in window) requestIdleCallback(() => run(), { timeout: 900 });
+            else setTimeout(run, 180);
+          }
+
+          function warmAllCollections() {
+            const order = ['originals', 'japan', 'fantasy', 'horror'];
+            let delay = 900;
+            order.forEach(filter => {
+              setTimeout(() => warmFilter(filter), delay);
+              delay += 650;
+            });
+          }'''
+          s = re.sub(r"  function preloadPuzzle\(id\) \{.*?\n  \}\n\n  function capturePositions", preload + "\n\n  function capturePositions", s, count=1, flags=re.S)
+
+          s = s.replace("const message = 'Tap any tile in the same row or column as the empty space. Every tile between it and the gap slides together. Use HINT to peek at the image, GUIDE to study it, and RESET if you want the original shuffle again.';", "const message = 'Tap a tile in the same row or column as the empty space. Every tile between it and the gap slides together. HINT briefly shows the picture. GUIDE gives you the solve path. RESET restores the starting shuffle.';")
+          s = s.replace("    if (action === 'filter') {\n      state.filter = element.dataset.filter || 'all'; savePrefs(); render(); return;\n    }", "    if (action === 'filter') { updateCollectionFilter(element.dataset.filter || 'all'); return; }")
+          s = s.replace("    if (action === 'help') { state.screen = 'help'; state.running = false; render(); return; }\n    if (action === 'back-from-help') { state.screen = 'home'; render(); return; }", "    if (action === 'help') { state.helpReturn = state.screen === 'game' ? 'game' : 'home'; state.guide = false; state.screen = 'help'; state.running = false; render(); return; }\n    if (action === 'back-from-help') { state.screen = state.helpReturn || 'home'; render(); return; }")
+          s = s.replace("    if (state.screen === 'collection' || state.screen === 'help') {\n      state.screen = 'home'; render(); return true;\n    }", "    if (state.screen === 'collection') {\n      state.screen = 'home'; render(); return true;\n    }\n    if (state.screen === 'help') {\n      state.screen = state.helpReturn || 'home'; render(); return true;\n    }")
+          s = s.replace("  preloadPuzzle(PUZZLES[0].id);\n  render();", "  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {\n    navigator.serviceWorker.register('./sw.js').catch(() => {});\n  }\n\n  preloadPuzzle(PUZZLES[0].id);\n  render();\n  warmFilter(state.filter);\n  warmAllCollections();")
+
+          p.write_text(s)
+
+          h = Path('web/index.html')
+          hs = h.read_text()
+          hs = hs.replace('#F3C623', '#F2C84B')
+          hs = hs.replace('  <title>Slide Tales</title>', '  <meta name="mobile-web-app-capable" content="yes" />\n  <meta name="apple-mobile-web-app-capable" content="yes" />\n  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />\n  <meta name="description" content="Slide Tales - retro comic sliding puzzles made for touch." />\n  <title>Slide Tales</title>')
+          h.write_text(hs)
+          PY
+
+          cat >> web/styles.css <<'CSS'
+
+          /* Mobile UI v2 */
+          :root {
+            --yellow:#f2c84b; --yellow2:#ffe16a; --ink:#171718; --ink2:#2a2a2d;
+            --red:#d94f45; --blue:#a9d6ea; --blue2:#5aadd0; --salmon:#ee8d7c;
+            --cream:#f7e7c3; --green:#79b989; --purple:#8972c5; --white:#fff9ed;
+          }
+          .shell { width:min(100%,540px); background:radial-gradient(circle at 95% 8%,rgba(169,214,234,.44),transparent 24%),radial-gradient(circle at 5% 80%,rgba(238,141,124,.26),transparent 25%),linear-gradient(165deg,var(--yellow2),var(--yellow) 64%,#edb935); }
+          .topbar { min-height:73px; padding:calc(9px + env(safe-area-inset-top)) 12px 5px; grid-template-columns:42px 1fr auto; }
+          .icon-btn { width:42px; height:42px; border-width:2.5px; box-shadow:0 3px 0 var(--ink); }
+          .logo { min-height:49px; font-family:"Arial Black",system-ui,sans-serif; transform:rotate(-1.5deg); }
+          .logo .slide { font-size:clamp(31px,9vw,38px); -webkit-text-stroke:1.5px var(--ink); text-shadow:2px 2px 0 var(--cream); }
+          .logo .tales { font-size:clamp(20px,6vw,25px); }
+          .star-badge { min-width:52px; padding:7px 8px; border-width:2.5px; border-radius:12px; font-size:12px; box-shadow:0 3px 0 var(--ink); }
+          .screen { padding:4px 11px calc(72px + env(safe-area-inset-bottom)); }
+          .home-screen { padding-bottom:calc(18px + env(safe-area-inset-bottom)); }
+          .hero-lockup { margin:2px 0 8px; text-align:center; }
+          .hero-copy { margin:0; font-family:"Arial Black",system-ui,sans-serif; font-size:14px; letter-spacing:.55px; }
+          .hero-sub { margin:2px 0 0; font-size:9px; font-weight:800; opacity:.66; }
+          .level-selector { gap:8px; }
+          .level-button { min-height:58px; padding:5px 8px; border-width:2.5px; border-radius:14px; box-shadow:0 4px 0 var(--ink); }
+          .level-button strong { font-family:"Arial Black",system-ui,sans-serif; font-size:22px; }
+          .level-button span { font-size:8px; } .level-button small { font-size:7px; }
+          .preview { margin:11px auto 9px; width:min(78vw,326px); padding:6px; border-width:3px; border-radius:19px; box-shadow:0 5px 0 var(--ink); }
+          .preview img,.preview-grid { border-radius:11px; } .preview-grid { inset:6px; }
+          .preview-chip { right:11px; bottom:11px; font-size:11px; }
+          .action { min-height:50px; border-width:2.5px; border-radius:13px; box-shadow:0 4px 0 var(--ink); transition:transform .12s ease,box-shadow .12s ease,filter .12s ease; }
+          .action.play { font-family:"Arial Black",system-ui,sans-serif; font-size:17px; }
+          .home-actions,.home-secondary { margin-top:8px; gap:8px; }
+          .home-actions .action { min-height:56px; font-size:9px; } .home-secondary .action { min-height:42px; font-size:8px; }
+          .title-row { grid-template-columns:41px 1fr; gap:8px; margin-bottom:8px; }
+          .title-row h1 { font-family:"Arial Black",system-ui,sans-serif; font-size:25px; line-height:1; }
+          .title-row p { font-size:8px; opacity:.68; }
+          .back { width:39px; height:39px; border-width:2.5px; box-shadow:0 3px 0 var(--ink); }
+          .collection-tabs { gap:7px; margin:8px -2px 6px; padding:2px 2px 6px; overscroll-behavior-x:contain; }
+          .collection-tab { min-width:68px; min-height:43px; padding:6px 9px; border-width:2.5px; border-radius:12px; box-shadow:0 3px 0 var(--ink); transition:transform .12s ease,background .14s ease,color .14s ease; }
+          .collection-tab strong { font-size:8px; } .collection-tab small { font-size:7px; }
+          .collection-tab.active { transform:translateY(-1px); }
+          .collection-summary { min-height:31px; margin:2px 0 8px; padding:6px 9px; border-radius:10px; }
+          .collection-summary b { font-size:9px; } .collection-summary span { font-size:8px; }
+          .cards { gap:8px; transition:opacity .12s ease,transform .12s ease; }
+          .cards.switching { opacity:.55; transform:translateY(2px); }
+          .card { padding:6px; border-width:2.5px; border-radius:13px; box-shadow:0 3px 0 var(--ink); content-visibility:auto; contain-intrinsic-size:205px; animation:cardIn .18s ease-out both; }
+          @keyframes cardIn { from { opacity:0; transform:translateY(4px); } }
+          .card-art { border-radius:9px; background:linear-gradient(135deg,rgba(169,214,234,.7),rgba(247,231,195,.8)); }
+          .card-art::before { content:''; position:absolute; inset:0; background:linear-gradient(110deg,transparent 25%,rgba(255,255,255,.35) 45%,transparent 65%); transform:translateX(-110%); animation:shimmer 1.2s ease-in-out 1; }
+          @keyframes shimmer { to { transform:translateX(110%); } }
+          .card-art img { position:relative; z-index:1; width:100%; height:100%; object-fit:cover; }
+          .card-chip { z-index:2; font-size:6px; border-width:1.5px; } .grid-chip { z-index:2; font-size:7px; border-width:1.5px; }
+          .card > strong { margin-top:5px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }
+          .card .category { display:none; }
+          .card-footer { margin-top:4px; } .card-footer small { font-size:7px; }
+          .game-screen { padding-bottom:calc(18px + env(safe-area-inset-bottom)); }
+          .game-head { grid-template-columns:40px 1fr 1fr 40px; gap:6px; }
+          .game-head .mini { padding:6px 4px; } .game-head .mini b { font-size:14px; } .game-head .mini span { font-size:6px; }
+          .now-playing { margin:6px 0; } .now-playing strong { font-family:"Arial Black",system-ui,sans-serif; font-size:16px; } .now-playing span { font-size:7px; }
+          .board-frame { width:min(100%,455px); padding:6px; border-width:3px; border-radius:17px; box-shadow:0 4px 0 var(--ink); }
+          .board { gap:2px; padding:2px; border-radius:10px; } .tile { border-radius:5px; }
+          .controls { margin-top:9px; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+          .control { min-width:0; min-height:52px; padding:4px; border-width:2.5px; border-radius:12px; font-size:18px; box-shadow:0 3px 0 var(--ink); }
+          .control span { font-size:7px; }
+          .game-help { min-height:38px; margin-top:7px; border-width:2px; font-size:8px; }
+          .progress { min-height:38px; margin-top:7px; padding:7px 9px; font-size:8px; }
+          .overlay { inset:6px; padding:12px; border-radius:12px; background:rgba(23,23,24,.985); backdrop-filter:none; gap:9px; }
+          .overlay h2 { font-family:"Arial Black",system-ui,sans-serif; font-size:21px; }
+          .overlay p { font-size:9px; } .overlay img { width:min(76%,285px); border-width:3px; border-radius:12px; }
+          .overlay-actions { gap:7px; } .overlay-actions .action { min-height:45px; font-size:9px; }
+          .guide-overlay { align-content:center; padding:14px 11px; }
+          .guide-kicker { padding:4px 7px; border:1.5px solid var(--yellow2); border-radius:99px; color:var(--yellow2); font-size:7px; font-weight:1000; letter-spacing:.7px; }
+          .quick-guide { width:100%; display:grid; gap:6px; }
+          .quick-step { display:grid; grid-template-columns:29px 1fr; gap:7px; align-items:center; padding:7px; border:1.5px solid rgba(255,255,255,.2); border-radius:10px; background:rgba(255,255,255,.06); }
+          .quick-step > b { width:29px; height:29px; display:grid; place-items:center; border-radius:50%; background:var(--red); color:white; font-family:"Arial Black",system-ui,sans-serif; font-size:13px; }
+          .quick-step strong,.quick-step span { display:block; } .quick-step strong { color:var(--blue); font-size:8px; } .quick-step span { margin-top:1px; color:var(--white); font-size:8px; line-height:1.25; font-weight:700; }
+          .guide-tip { width:100%; padding:7px 9px; border-radius:9px; background:var(--salmon); color:var(--ink); font-size:8px; line-height:1.3; font-weight:900; }
+          .help-intro { margin-bottom:8px; padding:10px; border-width:2.5px; border-radius:13px; } .help-intro h2 { font-family:"Arial Black",system-ui,sans-serif; font-size:18px; } .help-intro p { font-size:9px; }
+          .help-card { margin-bottom:8px; padding:9px; border-width:2.5px; border-radius:12px; grid-template-columns:30px 1fr; gap:8px; }
+          .help-num { width:29px; height:29px; font-size:14px; } .help-card h3 { font-size:11px; } .help-card p { font-size:8px; }
+          .help-grid { width:min(100%,205px); gap:2px; } .help-grid span { font-size:9px; }
+          .help-note { margin:8px 0; padding:9px; border-width:2.5px; font-size:8px; }
+          .bottom-nav { width:min(100%,540px); padding:7px 10px calc(7px + env(safe-area-inset-bottom)); gap:7px; } .bottom-nav button { min-height:44px; font-size:8px; }
+          @media (max-width:360px) {
+            .topbar { grid-template-columns:39px 1fr auto; padding-inline:9px; } .icon-btn { width:39px; height:39px; }
+            .screen { padding-inline:9px; } .logo .slide { font-size:30px; } .logo .tales { font-size:19px; }
+            .star-badge { min-width:48px; padding-inline:6px; } .level-button strong { font-size:20px; }
+            .preview { width:min(79vw,294px); } .card > strong { font-size:11px; } .controls { gap:5px; } .control { min-height:49px; font-size:16px; }
+          }
+          CSS
+
+          cat > web/sw.js <<'JS'
+          const SHELL_CACHE='slide-tales-shell-v2';
+          const IMAGE_CACHE='slide-tales-images-v2';
+          const SHELL=['./','./index.html','./styles.css','./app.js'];
+          self.addEventListener('install',e=>e.waitUntil(caches.open(SHELL_CACHE).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting())));
+          self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>![SHELL_CACHE,IMAGE_CACHE].includes(k)).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+          self.addEventListener('fetch',e=>{
+            const r=e.request; if(r.method!=='GET') return; const u=new URL(r.url); if(u.origin!==self.location.origin) return;
+            if(r.destination==='image'||u.pathname.includes('/assets/')){
+              e.respondWith(caches.open(IMAGE_CACHE).then(async c=>{const hit=await c.match(r);if(hit)return hit;try{const res=await fetch(r);if(res.ok)c.put(r,res.clone());return res}catch(_){return hit||Response.error()}}));return;
+            }
+            if(r.mode==='navigate'){e.respondWith(fetch(r).catch(()=>caches.match('./index.html')));return}
+            e.respondWith(caches.match(r).then(hit=>hit||fetch(r)));
+          });
+          JS
+
+          cat > web/_headers <<'HDR'
+          /assets/*
+            Cache-Control: public, max-age=2592000, stale-while-revalidate=86400
+
+          /app.js
+            Cache-Control: public, max-age=3600, must-revalidate
+
+          /styles.css
+            Cache-Control: public, max-age=3600, must-revalidate
+
+          /sw.js
+            Cache-Control: no-cache
+
+          /index.html
+            Cache-Control: no-cache
+          HDR
+
+          node --check web/app.js
 
       - name: Install asset tools
         run: |
@@ -42,8 +337,8 @@ jobs:
           mkdir -p "$PUZZLES" "$THUMBS" /tmp/packs
 
           convert_one() {
-            cwebp -quiet -q 82 -resize 768 768 "$1" -o "$PUZZLES/$2.webp"
-            cwebp -quiet -q 72 -resize 240 240 "$1" -o "$THUMBS/$2.webp"
+            cwebp -quiet -q 80 -resize 768 768 "$1" -o "$PUZZLES/$2.webp"
+            cwebp -quiet -q 68 -resize 192 192 "$1" -o "$THUMBS/$2.webp"
           }
 
           declare -A O=(
@@ -82,8 +377,9 @@ jobs:
           pack 'horror-slides.rar' horror
           test "$(find "$PUZZLES" -name '*.webp' | wc -l)" -eq 43
           test "$(find "$THUMBS" -name '*.webp' | wc -l)" -eq 43
+          du -sh web/assets
 
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..sOfd_nNLsyrRWMKY.Qu-1SIqOdOxlUlXtGwn6w3ko4wGiq-xExJLqA7yrZgv3cJZTQAVXoN2U8tKsPXFJYKJLBtF35wwPgSfY8hwyMv7dqGidyBXp4Z_Xnucv1fCEHtHwQvmUh7eU7Sl1eYPXforKSANbFNydd3Oy5IwqZZZ2Px_cUCiVSStgu30SSO4ppB2iujjmvpamfOyrEyxzv99MkTtXidRP7juCw0jzyrO2pjVVGHPyfrdtUnBfBlo7m0RLnf8WCZe6o1ae4dhbQlxli7Fp_mYNui7F4RtYtOoV4neYIwlze8u0gD2br4jOAMB3vGW76amJc2b6TZbsPJ1GsCDFew3WSVQHq6SaVOPs3QmmXXSJzTHI8mzcZeBmXfcAAEbYUU9YsbuDAcQutY1J9av2.sp99rWQLvvRuAA8nt0hUaQ" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..pQ22-FRYCCTLSUcs.vh7UA2O3gfuw4RIwPR8VfgDack8tQzcAiJQBcbKvFtosgi7qF0hF4ScO4HmMjcC3OMzJKty5p5V9v0dh1diXyYlO85KVaXYORsho5sjnQj-Ulk0_o5GRoCkc6UiYsKFCeprylrqght_l0Y3s1IJPRclodOTs11PqYxkc2cbu_19Um6LfWF9sIffStbM3wvEt5CTjH0Zj3S5W3ssteC9cqQnUAJhUCU84dldr8JG3s0xLMJuW-yRDnN_cVyqXXXZSmdC-QATt-4HZu0mbN-iTekCVI2SzSsswRareOm2GZLGMyD8ZGx_1Gv7ewzsig0lxESo40aPnuHcwc-K7WkK-lEH90rTEDEgGH2zxMkhFW-yolHlEl_qocELd3tkLtWk01NXfFiTY.liEF-5frNAV93Y9zvnuiAw" --no-wait
