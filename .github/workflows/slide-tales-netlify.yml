@@ -659,6 +659,13 @@ jobs:
           grep -q "function warmPuzzleSet(filter)" web/app.js
           grep -q "prewarm-card-image" web/app.js
 
+      - name: Upload current web audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slide-tales-current-web
+          path: web
+          retention-days: 1
+
       - name: Install asset tools
         run: |
           sudo apt-get update
