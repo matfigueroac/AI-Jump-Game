@@ -2,9 +2,10 @@ name: Build Slide Tales Android Release
 
 on:
   push:
-    branches: [slide-tales-android-build]
+    branches:
+      - slide-tales-android-build
     paths:
-      - '.github/workflows/slide-tales-android-release.yml'
+      - .github/workflows/slide-tales-android-release.yml
   workflow_dispatch:
 
 permissions:
@@ -58,14 +59,18 @@ jobs:
           done
 
           pack() {
-            remote="$1"; prefix="$2"; rar="/tmp/packs/$prefix.rar"; dir="/tmp/packs/$prefix"
+            remote="$1"
+            prefix="$2"
+            rar="/tmp/packs/$prefix.rar"
+            dir="/tmp/packs/$prefix"
             mkdir -p "$dir"
             curl --retry 4 --retry-delay 2 -fsSL "$BASE/$remote" -o "$rar"
             unar -q -f -o "$dir" "$rar" >/dev/null
             mapfile -d '' files < <(find "$dir" -type f \( -iname '*.png' -o -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.webp' \) -print0 | sort -zV)
             test "${#files[@]}" -eq 10
             for i in "${!files[@]}"; do
-              n=$((i+1)); id=$(printf '%s-%02d' "$prefix" "$n")
+              n=$((i+1))
+              id=$(printf '%s-%02d' "$prefix" "$n")
               convert_one "${files[$i]}" "$id"
             done
           }
@@ -85,7 +90,6 @@ jobs:
           sed -i '/android.permission.ACCESS_NETWORK_STATE/d' "$MANIFEST"
           sed -i '/android.permission.REQUEST_INSTALL_PACKAGES/d' "$MANIFEST"
           sed -i '/android.permission.QUERY_ALL_PACKAGES/d' "$MANIFEST"
-          echo 'Release manifest:'
           cat "$MANIFEST"
 
       - uses: actions/setup-java@v4
@@ -101,60 +105,15 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Generate release signing key
+      - name: Generate release signing key and config
         shell: bash
         run: |
           set -euo pipefail
           PASS=$(openssl rand -hex 24)
           echo "$PASS" > slide-tales-android/signing-password.txt
-          keytool -genkeypair -v             -keystore slide-tales-android/app/slidetales-release.jks             -storepass "$PASS"             -keypass "$PASS"             -alias slidetales             -keyalg RSA             -keysize 4096             -validity 10000             -dname "CN=Slide Tales, OU=Games, O=Slide Tales, L=Santiago, ST=RM, C=CL"
-
-          if [ -f slide-tales-android/app/build.gradle ]; then
-            cat >> slide-tales-android/app/build.gradle <<'GRADLE'
-
-android {
-    signingConfigs {
-        release {
-            storeFile file("slidetales-release.jks")
-            storePassword file("../signing-password.txt").text.trim()
-            keyAlias "slidetales"
-            keyPassword file("../signing-password.txt").text.trim()
-        }
-    }
-    buildTypes {
-        release {
-            debuggable false
-            minifyEnabled false
-            signingConfig signingConfigs.release
-        }
-    }
-}
-GRADLE
-          elif [ -f slide-tales-android/app/build.gradle.kts ]; then
-            cat >> slide-tales-android/app/build.gradle.kts <<'GRADLEKTS'
-
-android {
-    signingConfigs {
-        create("releaseLocal") {
-            storeFile = file("slidetales-release.jks")
-            storePassword = file("../signing-password.txt").readText().trim()
-            keyAlias = "slidetales"
-            keyPassword = file("../signing-password.txt").readText().trim()
-        }
-    }
-    buildTypes {
-        getByName("release") {
-            isDebuggable = false
-            isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("releaseLocal")
-        }
-    }
-}
-GRADLEKTS
-          else
-            echo "No app Gradle file found" >&2
-            exit 1
-          fi
+          keytool -genkeypair -v -keystore slide-tales-android/app/slidetales-release.jks -storepass "$PASS" -keypass "$PASS" -alias slidetales -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=Slide Tales, OU=Games, O=Slide Tales, L=Santiago, ST=RM, C=CL"
+          test -f slide-tales-android/app/build.gradle
+          printf '%s\n'             ''             'android {'             '    signingConfigs {'             '        releaseLocal {'             '            storeFile file("slidetales-release.jks")'             '            storePassword file("../signing-password.txt").text.trim()'             '            keyAlias "slidetales"'             '            keyPassword file("../signing-password.txt").text.trim()'             '        }'             '    }'             '    buildTypes {'             '        release {'             '            debuggable false'             '            minifyEnabled false'             '            signingConfig signingConfigs.releaseLocal'             '        }'             '    }'             '}' >> slide-tales-android/app/build.gradle
 
       - name: Build signed Release APK and AAB
         working-directory: slide-tales-android
@@ -166,7 +125,7 @@ GRADLEKTS
           set -euo pipefail
           APK=$(find slide-tales-android/app/build/outputs/apk/release -name '*.apk' | head -1)
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs "$APK"
-          echo 'Manifest permission/debug scan:'
+          echo 'Manifest scan:'
           "$ANDROID_HOME/build-tools/35.0.0/aapt2" dump xmltree "$APK" --file AndroidManifest.xml | grep -E 'permission|debuggable|usesCleartextTraffic' || true
 
       - name: Prepare deliverables
@@ -178,14 +137,12 @@ GRADLEKTS
           cp "$APK" SlideTales-Android-v1.0.1-release.apk
           cp "$AAB" SlideTales-Android-v1.0.1-release.aab
           cp slide-tales-android/app/slidetales-release.jks slide-tales-release.jks
-          {
-            echo 'Slide Tales Android signing information'
-            echo 'Alias: slidetales'
-            printf 'Keystore password: '
-            cat slide-tales-android/signing-password.txt
-            echo
-            echo 'IMPORTANT: keep this keystore and password for future updates.'
-          } > SIGNING_INFO.txt
+          echo 'Slide Tales Android signing information' > SIGNING_INFO.txt
+          echo 'Alias: slidetales' >> SIGNING_INFO.txt
+          printf 'Keystore password: ' >> SIGNING_INFO.txt
+          cat slide-tales-android/signing-password.txt >> SIGNING_INFO.txt
+          echo >> SIGNING_INFO.txt
+          echo 'IMPORTANT: keep this keystore and password for future updates.' >> SIGNING_INFO.txt
           sha256sum SlideTales-Android-v1.0.1-release.apk > APK_SHA256.txt
           ls -lh SlideTales-Android-v1.0.1-release.apk SlideTales-Android-v1.0.1-release.aab
 
