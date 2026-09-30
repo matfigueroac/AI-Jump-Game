@@ -499,6 +499,13 @@ jobs:
 
           node --check web/app.js
 
+      - name: Upload patched web debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: slide-tales-web-debug
+          path: web
+          retention-days: 1
+
       - name: Install asset tools
         run: |
           sudo apt-get update
