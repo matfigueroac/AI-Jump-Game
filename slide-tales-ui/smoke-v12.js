@@ -11,7 +11,7 @@ let src=fs.readFileSync('web/app.js','utf8');
 src=src.replace(/\}\)\(\);\s*$/, "globalThis.__slideTest={handle,state,render,dailyPuzzle,questState,achievements,continuePuzzle,totalStars,playerLevel};})();");
 try{eval(src)}catch(e){console.error('LOAD ERROR',e.stack);process.exit(2)}
 const assert=(c,m)=>{if(!c){console.error('ASSERT FAIL',m);console.error(html.slice(0,2500));process.exit(3)}};
-assert(html.includes("TODAY'S GOALS"),'home goals');
+assert(html.includes("TODAY’S GOALS"),'home goals');
 assert(html.includes('CONTINUE JOURNEY'),'home continue');
 assert(html.includes('profile-trigger'),'profile trigger');
 const T=global.__slideTest;
