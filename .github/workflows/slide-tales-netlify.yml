@@ -1059,15 +1059,7 @@ jobs:
           app_v.write_text(s)
 
           h = index.read_text()
-          cleanup = """  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
-    }
-    if ('caches' in window) {
-      caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('slide-tales-shell-')).map(k => caches.delete(k)))).catch(() => {});
-    }
-  </script>
-"""
+          cleanup = "  <script>\n    if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {}); }\n    if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('slide-tales-shell-')).map(k => caches.delete(k)))).catch(() => {}); }\n  </script>\n"
           h = h.replace('  <script src="./app-comic-v9.js"></script>', cleanup + '  <script src="./app-comic-v9.js"></script>')
           index.write_text(h)
 
@@ -1164,4 +1156,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..tNH3iE7INXIQ8OC9.JLW0-OadVlDRlH4c47FBZM4cOT0Ee4WqlJfAKfe907wS8NEgzC3TNHkF0uMuX9fuPmHzgXOCPs8KxOd-Wck0xc33MZg25HZQIHvsVmenz7AgepEsC8lTRSXe5SwayAeTFpD3e1RkfpGbtx9InudJRIOatjxwzPH7VrvvkNwJpX_QPATikVE1KGxGr1UVFvZuGgGORu5gI142Rfv9zc1Zr1WlsvXJSBDxb09a-x2euUyE9I9sfCPSd0QYET7MTq4EdDVZ__J9gqmLUath0r2S6G075Vw4MYV46R3Af9CrU7n_ucJSXeBlR7FcoT6TgknaVFjcDlZjhK-mBXHrjJN9tZE6PUGW4JX8WxEjasxEe1IM7L1rnnGyEiSKolUItQImxSG2Mzya.Fc8Uia3_gh6GvE51UOUgHQ" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..eGaIBwwg5tUDd46D.0RgAreQ2ALypW1xLCEZyjLBA6KufqyU7IuGdtrCP9X9t9y5majICw1fbYDRNcRqXAQ17e7vQvNnXTIaS4GQIT1OCYVa1bXUmxIt4YQrZEgwQORWIhfBUEprex5wxgo4Au49C1rFtpljy0HABzBkkBBaOwBiqP7AEhc6kgjo1xIkMAH6XOnRaenwotUlODZWcCscNuKq87HIXi-WfnspLEapnx2nsxmoNksTFoqpiZrR4_MU2TSNaQUaHkIgUnRYR7EKTK3OPQZMdNoi1a59YQfUQB8cbCi1KD9zwx5AODcMw9P64hmeOC8-tavQpfs-GZIoxeLvUbUf_wD7Fdrnxf4_XRzTlVVLBay9cifUx58LR-tRMk2pv70N7UfE0cwJIzOVPvtOJ.lCitITb1HE1TwBDWUngatg" --no-wait
