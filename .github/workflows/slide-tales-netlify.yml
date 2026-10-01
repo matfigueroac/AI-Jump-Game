@@ -1064,19 +1064,7 @@ jobs:
               sw.write_text(x)
 
           hdr = headers.read_text() if headers.exists() else ''
-          hdr += """
-/app-comic-v8.js
-  Cache-Control: public, max-age=31536000, immutable
-
-/styles-comic-v8.css
-  Cache-Control: public, max-age=31536000, immutable
-
-/assets/ui/retro-slide-tales-logo-comic-v8.webp
-  Cache-Control: public, max-age=31536000, immutable
-
-/
-  Cache-Control: no-cache, no-store, must-revalidate
-"""
+          hdr += "\n/app-comic-v8.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/styles-comic-v8.css\n  Cache-Control: public, max-age=31536000, immutable\n\n/assets/ui/retro-slide-tales-logo-comic-v8.webp\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: no-cache, no-store, must-revalidate\n"
           headers.write_text(hdr)
           PY
 
@@ -1089,6 +1077,13 @@ jobs:
           grep -q 'app-comic-v8.js' web/index.html
           grep -q 'slide-tales-ui-version' web/index.html
           test -s web/assets/ui/retro-slide-tales-logo-comic-v8.webp
+
+      - name: Upload Comic v8 verification artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slide-tales-comic-v8-web
+          path: web
+          retention-days: 1
 
       - name: Install asset tools
         run: |
@@ -1150,4 +1145,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..Ry2Ube38caKdFeV4.jdLF3HAmxqyZjNO6Bz-7XTy2hT4ZDzxBztNxGuWfIlq9nc_jkAIVPSejM1MylOceTq3JKNop-ZlbijkT4wLkkidUQewYTCOaU9LU7WJRN6fwIzuPuAATLIGujT5mmxqkWqjCr0NZsoEy3VrhZmloHY0w4Ij8ZrEFiPW-YPyedcqoWSrzR3tdNzGahozxdjQ1aax6xjA9xoKoW9hgT14T2n36JgiVDl_tO5-1WNNJzExCZPfnWp32yzXaFTEVZmk8VxCujXKuKWKSiJvK0vP2Ay3MvAd-aXQqsNUKYk3xuZyoyFiZ6oy_UAtQI14mFO43gXL_l_oquOpSrAtlOYFMMd5lZeYTQbOFX2zs5IHiFkfp0EDAnw1nY_qp5lqw5bWAK6gtGLF4.vmAVCVDVP3-c7YK0iI2O4Q" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..ab6yTZG9AkbzNkhq.tUgE-nLVRC65b5tBUnZcfj6SySyKGzHsQymjURZolWmQAoWYGIkhSau3N3gWelLplUBz9BtJsvi4sK2SKNIHw_cloX6sdB-qx6MFF0_8iIfR0kJVLPqGpNlowm3_J33uptLImQ6r3DzrOHECnM3bkpd9KPF9IQ4f8Cupk2AJHlLg0oGbl9RZGgkfmVpAgUm3Wh5DOIBzGTHss_fPxDWKPShk7QIYcZUlHOoLUFh78B3xylMPujajHEtLhc4GzerVhDE0aEnSU3NynsFgoNwhbPspYKYQQENhWvS8dIorUBJtpNYaJSgRd0j2CMzsN87uslO_NjGE0RvczBM5jYXtJCYkAo0LlYBvG_fPlc4ULb9LC2yOegnW-9AYm-f5PFP7NcZcXXDa.3wDzf_dQkUtafSN7imPx5g" --no-wait
