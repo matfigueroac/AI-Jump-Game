@@ -1023,7 +1023,7 @@ jobs:
           from pathlib import Path
           import re
 
-          version = 'comic-v8'
+          version = 'comic-v9'
           app = Path('web/app.js')
           css = Path('web/styles.css')
           index = Path('web/index.html')
@@ -1044,44 +1044,63 @@ jobs:
           h = h.replace('./app.js', f'./app-{version}.js')
           if 'slide-tales-ui-version' not in h:
               h = h.replace('<meta name="theme-color" content="#F2C84B" />',
-                            '<meta name="theme-color" content="#F2C84B" />\n  <meta name="slide-tales-ui-version" content="comic-v8" />')
+                            '<meta name="theme-color" content="#F2C84B" />\n  <meta name="slide-tales-ui-version" content="comic-v9" />')
           index.write_text(h)
 
           # Point the logo to the versioned file in the versioned app bundle.
           s = app_v.read_text().replace('./assets/ui/retro-slide-tales-logo.webp',
                                         f'./assets/ui/retro-slide-tales-logo-{version}.webp')
+          s = re.sub(
+              r"\n  if \('serviceWorker' in navigator && \(location\.protocol === 'https:' \|\| location\.hostname === 'localhost'\)\) \{\n    navigator\.serviceWorker\.register\('\./sw\.js'\)\.catch\(\(\) => \{\}\);\n  \}\n",
+              "\n",
+              s,
+              count=1
+          )
           app_v.write_text(s)
+
+          h = index.read_text()
+          cleanup = """  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {});
+    }
+    if ('caches' in window) {
+      caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('slide-tales-shell-')).map(k => caches.delete(k)))).catch(() => {});
+    }
+  </script>
+"""
+          h = h.replace('  <script src="./app-comic-v9.js"></script>', cleanup + '  <script src="./app-comic-v9.js"></script>')
+          index.write_text(h)
 
           if sw.exists():
               x = sw.read_text()
-              x = re.sub(r"const SHELL_CACHE='[^']+';", "const SHELL_CACHE='slide-tales-shell-v8';", x, count=1)
+              x = re.sub(r"const SHELL_CACHE='[^']+';", "const SHELL_CACHE='slide-tales-shell-v9';", x, count=1)
               x = re.sub(
                   r"const SHELL=\[[^;]+\];",
-                  "const SHELL=['./','./index.html','./styles-comic-v8.css','./app-comic-v8.js','./assets/ui/retro-slide-tales-logo-comic-v8.webp'];",
+                  "const SHELL=['./','./index.html','./styles-comic-v9.css','./app-comic-v9.js','./assets/ui/retro-slide-tales-logo-comic-v9.webp'];",
                   x,
                   count=1
               )
               sw.write_text(x)
 
           hdr = headers.read_text() if headers.exists() else ''
-          hdr += "\n/app-comic-v8.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/styles-comic-v8.css\n  Cache-Control: public, max-age=31536000, immutable\n\n/assets/ui/retro-slide-tales-logo-comic-v8.webp\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: no-cache, no-store, must-revalidate\n"
+          hdr += "\n/app-comic-v9.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/styles-comic-v9.css\n  Cache-Control: public, max-age=31536000, immutable\n\n/assets/ui/retro-slide-tales-logo-comic-v9.webp\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: no-cache, no-store, must-revalidate\n"
           headers.write_text(hdr)
           PY
 
-          node --check web/app-comic-v8.js
-          cp slide-tales-ui/smoke-ui.js /tmp/smoke-ui-v8.js
-          sed -i "s#web/app.js#web/app-comic-v8.js#g" /tmp/smoke-ui-v8.js
-          node /tmp/smoke-ui-v8.js
+          node --check web/app-comic-v9.js
+          cp slide-tales-ui/smoke-ui.js /tmp/smoke-ui-v9.js
+          sed -i "s#web/app.js#web/app-comic-v9.js#g" /tmp/smoke-ui-v9.js
+          node /tmp/smoke-ui-v9.js
 
-          grep -q 'styles-comic-v8.css' web/index.html
-          grep -q 'app-comic-v8.js' web/index.html
+          grep -q 'styles-comic-v9.css' web/index.html
+          grep -q 'app-comic-v9.js' web/index.html
           grep -q 'slide-tales-ui-version' web/index.html
-          test -s web/assets/ui/retro-slide-tales-logo-comic-v8.webp
+          test -s web/assets/ui/retro-slide-tales-logo-comic-v9.webp
 
-      - name: Upload Comic v8 verification artifact
+      - name: Upload Comic v9 verification artifact
         uses: actions/upload-artifact@v4
         with:
-          name: slide-tales-comic-v8-web
+          name: slide-tales-comic-v9-web
           path: web
           retention-days: 1
 
@@ -1145,4 +1164,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..ab6yTZG9AkbzNkhq.tUgE-nLVRC65b5tBUnZcfj6SySyKGzHsQymjURZolWmQAoWYGIkhSau3N3gWelLplUBz9BtJsvi4sK2SKNIHw_cloX6sdB-qx6MFF0_8iIfR0kJVLPqGpNlowm3_J33uptLImQ6r3DzrOHECnM3bkpd9KPF9IQ4f8Cupk2AJHlLg0oGbl9RZGgkfmVpAgUm3Wh5DOIBzGTHss_fPxDWKPShk7QIYcZUlHOoLUFh78B3xylMPujajHEtLhc4GzerVhDE0aEnSU3NynsFgoNwhbPspYKYQQENhWvS8dIorUBJtpNYaJSgRd0j2CMzsN87uslO_NjGE0RvczBM5jYXtJCYkAo0LlYBvG_fPlc4ULb9LC2yOegnW-9AYm-f5PFP7NcZcXXDa.3wDzf_dQkUtafSN7imPx5g" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..tNH3iE7INXIQ8OC9.JLW0-OadVlDRlH4c47FBZM4cOT0Ee4WqlJfAKfe907wS8NEgzC3TNHkF0uMuX9fuPmHzgXOCPs8KxOd-Wck0xc33MZg25HZQIHvsVmenz7AgepEsC8lTRSXe5SwayAeTFpD3e1RkfpGbtx9InudJRIOatjxwzPH7VrvvkNwJpX_QPATikVE1KGxGr1UVFvZuGgGORu5gI142Rfv9zc1Zr1WlsvXJSBDxb09a-x2euUyE9I9sfCPSd0QYET7MTq4EdDVZ__J9gqmLUath0r2S6G075Vw4MYV46R3Af9CrU7n_ucJSXeBlR7FcoT6TgknaVFjcDlZjhK-mBXHrjJN9tZE6PUGW4JX8WxEjasxEe1IM7L1rnnGyEiSKolUItQImxSG2Mzya.Fc8Uia3_gh6GvE51UOUgHQ" --no-wait
