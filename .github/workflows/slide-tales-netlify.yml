@@ -1043,6 +1043,21 @@ jobs:
           grep -q 'challenge-strip' web/app.js
           grep -q 'NEXT PUZZLE' web/app.js
 
+      - name: Apply v12 engagement layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          python slide-tales-ui/apply-v12.py
+          cat slide-tales-ui/v12-engagement.css >> web/styles.css
+          node --check web/app.js
+          node slide-tales-ui/smoke-ui.js
+          node slide-tales-ui/smoke-v11.js
+          node slide-tales-ui/smoke-v12.js
+          grep -q "TODAY'S GOALS" web/app.js
+          grep -q 'CONTINUE JOURNEY' web/app.js
+          grep -q 'PLAYER CARD' web/app.js
+          grep -q 'profile-trigger' web/app.js
+
       - name: Version shell assets to bypass old service workers
         shell: bash
         run: |
@@ -1051,7 +1066,7 @@ jobs:
           from pathlib import Path
           import re
 
-          version = 'comic-v11'
+          version = 'comic-v12'
           app = Path('web/app.js')
           css = Path('web/styles.css')
           index = Path('web/index.html')
@@ -1072,7 +1087,7 @@ jobs:
           h = h.replace('./app.js', f'./app-{version}.js')
           if 'slide-tales-ui-version' not in h:
               h = h.replace('<meta name="theme-color" content="#F2C84B" />',
-                            '<meta name="theme-color" content="#F2C84B" />\n  <meta name="slide-tales-ui-version" content="comic-v11" />')
+                            '<meta name="theme-color" content="#F2C84B" />\n  <meta name="slide-tales-ui-version" content="comic-v12" />')
           index.write_text(h)
 
           # Point the logo to the versioned file in the versioned app bundle.
@@ -1088,39 +1103,39 @@ jobs:
 
           h = index.read_text()
           cleanup = "  <script>\n    if ('serviceWorker' in navigator) { navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister())).catch(() => {}); }\n    if ('caches' in window) { caches.keys().then(keys => Promise.all(keys.filter(k => k.startsWith('slide-tales-shell-')).map(k => caches.delete(k)))).catch(() => {}); }\n  </script>\n"
-          h = h.replace('  <script src="./app-comic-v11.js"></script>', cleanup + '  <script src="./app-comic-v11.js"></script>')
+          h = h.replace('  <script src="./app-comic-v12.js"></script>', cleanup + '  <script src="./app-comic-v12.js"></script>')
           index.write_text(h)
 
           if sw.exists():
               x = sw.read_text()
-              x = re.sub(r"const SHELL_CACHE='[^']+';", "const SHELL_CACHE='slide-tales-shell-v11';", x, count=1)
+              x = re.sub(r"const SHELL_CACHE='[^']+';", "const SHELL_CACHE='slide-tales-shell-v12';", x, count=1)
               x = re.sub(
                   r"const SHELL=\[[^;]+\];",
-                  "const SHELL=['./','./index.html','./styles-comic-v11.css','./app-comic-v11.js','./assets/ui/retro-slide-tales-logo-comic-v11.webp'];",
+                  "const SHELL=['./','./index.html','./styles-comic-v12.css','./app-comic-v12.js','./assets/ui/retro-slide-tales-logo-comic-v12.webp'];",
                   x,
                   count=1
               )
               sw.write_text(x)
 
           hdr = headers.read_text() if headers.exists() else ''
-          hdr += "\n/app-comic-v11.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/styles-comic-v11.css\n  Cache-Control: public, max-age=31536000, immutable\n\n/assets/ui/retro-slide-tales-logo-comic-v11.webp\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: no-cache, no-store, must-revalidate\n"
+          hdr += "\n/app-comic-v12.js\n  Cache-Control: public, max-age=31536000, immutable\n\n/styles-comic-v12.css\n  Cache-Control: public, max-age=31536000, immutable\n\n/assets/ui/retro-slide-tales-logo-comic-v12.webp\n  Cache-Control: public, max-age=31536000, immutable\n\n/\n  Cache-Control: no-cache, no-store, must-revalidate\n"
           headers.write_text(hdr)
           PY
 
-          node --check web/app-comic-v11.js
-          cp slide-tales-ui/smoke-v11.js /tmp/smoke-v11-versioned.js
-          sed -i "s#web/app.js#web/app-comic-v11.js#g" /tmp/smoke-v11-versioned.js
-          node /tmp/smoke-v11-versioned.js
+          node --check web/app-comic-v12.js
+          cp slide-tales-ui/smoke-v12.js /tmp/smoke-v12-versioned.js
+          sed -i "s#web/app.js#web/app-comic-v12.js#g" /tmp/smoke-v12-versioned.js
+          node /tmp/smoke-v12-versioned.js
 
-          grep -q 'styles-comic-v11.css' web/index.html
-          grep -q 'app-comic-v11.js' web/index.html
+          grep -q 'styles-comic-v12.css' web/index.html
+          grep -q 'app-comic-v12.js' web/index.html
           grep -q 'slide-tales-ui-version' web/index.html
-          test -s web/assets/ui/retro-slide-tales-logo-comic-v11.webp
+          test -s web/assets/ui/retro-slide-tales-logo-comic-v12.webp
 
-      - name: Upload Comic v11 verification artifact
+      - name: Upload Comic v12 verification artifact
         uses: actions/upload-artifact@v4
         with:
-          name: slide-tales-comic-v11-web
+          name: slide-tales-comic-v12-web
           path: web
           retention-days: 1
 
@@ -1184,4 +1199,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..z7rn8wy9zwgN-MR0.lkLC3A7u6lECfjpmIsc3M_rWJaxcMF2uCh1t5vFRVMYArE0ajgnDpQHYvbVhkDOEDD6hls5vGvB6ekM4LZKRjw3GcirkXe-y4yaExCYxWjZv6vri2dkLU72Wa2f7F7jmhXZfO3pI5LNg-WOHmKWjFzvPwOq4cGBppKhDXoA7BxajS-HfHgExyqNUXfHue814oO6iu6U8AAZ4PN0mfwkvS4R9klBO9I-SCLHUA1iFLnZtrcAgeYJvJRTBnsOnN2dG1lKxWl6K_fNFhBuldIOB8mfmvv2vOwVOhCiPy59SRVgT7KHQauaQtOOUcNj_DnwfRetv-fQJerYPogbXDMxAlW-kJKVGILnWjIkbyhrMfj-grcziyyAaRQonaRGpf0mOgknQnMIE.v_hz40RcNDUBgkoV35DYIw" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..TegaSAIH0xjU0i7G.MuOM4EikbWWnbfRBRjSa9p05kzrv515oCuDAf8RB2YIM8QWraUXHaCBuI12ywn8FqoJ-RrRC8VdMQ43z0RokiyWO0gUmnEUNmU9XywTK4-23K5YhfCFAvqu2xQ11NIxKR8zib7llK2IrxqhO0-gdHO4BJ5mbM_2Rp5rGA_wP_iJ9diaRrCDtwZwiKP7xuMkDbaUJ-5mI7awn1LDm8uZ2w7RWaXoJ4uHHSasAqO_bhlq3zK1hcX0KHniJSrbSkxpII9WMvYgV_vRE4vOs1c0FJLAtqtV3WlY1qa9JCDfEeBYTR2YL3qPdBwjuLJEV41DcDvESJJJi3ZALPvPh27JUGyklXw3cZMx-R-x9GayUWSrbYDqE6a3sctTFkZiH9RE8cedX71Mm.Z-gztvqZRmCf8BnmYcJc7g" --no-wait
