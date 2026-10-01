@@ -1053,7 +1053,7 @@ jobs:
           node slide-tales-ui/smoke-ui.js
           node slide-tales-ui/smoke-v11.js
           node slide-tales-ui/smoke-v12.js
-          grep -q "TODAY'S GOALS" web/app.js
+          grep -q 'TODAY’S GOALS' web/app.js
           grep -q 'CONTINUE JOURNEY' web/app.js
           grep -q 'PLAYER CARD' web/app.js
           grep -q 'profile-trigger' web/app.js
@@ -1199,4 +1199,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..TegaSAIH0xjU0i7G.MuOM4EikbWWnbfRBRjSa9p05kzrv515oCuDAf8RB2YIM8QWraUXHaCBuI12ywn8FqoJ-RrRC8VdMQ43z0RokiyWO0gUmnEUNmU9XywTK4-23K5YhfCFAvqu2xQ11NIxKR8zib7llK2IrxqhO0-gdHO4BJ5mbM_2Rp5rGA_wP_iJ9diaRrCDtwZwiKP7xuMkDbaUJ-5mI7awn1LDm8uZ2w7RWaXoJ4uHHSasAqO_bhlq3zK1hcX0KHniJSrbSkxpII9WMvYgV_vRE4vOs1c0FJLAtqtV3WlY1qa9JCDfEeBYTR2YL3qPdBwjuLJEV41DcDvESJJJi3ZALPvPh27JUGyklXw3cZMx-R-x9GayUWSrbYDqE6a3sctTFkZiH9RE8cedX71Mm.Z-gztvqZRmCf8BnmYcJc7g" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..vaXB5O1rjFsrPcHt.7-Y9UNH1CX6oCoM5V9xz5w-Hd2RQ32yCkrIGATrJS8u0j9zC_XUNcD0wOsbYqHV6YyxlvVhVaJSwXWiY5LZdO8ZdyA6268glhdF8fclHe2QYo2mZ84vbsW0-p-17hunReT7PCrabgwgWlXRzTBYJEJ_a0wq_zb9_ZAn0Gtp1okGefheXBz3cPQUNUjUx-90QOspySUZuL6gG7Zq2XGSUbzoWxzde3KdIESiEK08WjkPt_cIFVMv7Z2i685mebJGCd6B-RP1z2um21ZK-oJu07tAPj5I0JudQHkvExo8MPZNaM7N_NhzGw2RBOD9GEYteZDQ_9e3wqBqTi9kkYdribrSXkRGwwaOXDIPK_8MqF7hLQhIhGfpfWv4nw41t498OvWaBuP6i.KTWwVvmnL4zskoF5qHR0Zg" --no-wait
