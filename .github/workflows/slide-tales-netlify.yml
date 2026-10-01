@@ -1015,6 +1015,81 @@ jobs:
             exit 1
           fi
 
+      - name: Version shell assets to bypass old service workers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          version = 'comic-v8'
+          app = Path('web/app.js')
+          css = Path('web/styles.css')
+          index = Path('web/index.html')
+          sw = Path('web/sw.js')
+          headers = Path('web/_headers')
+
+          app_v = Path(f'web/app-{version}.js')
+          css_v = Path(f'web/styles-{version}.css')
+          logo_src = Path('web/assets/ui/retro-slide-tales-logo.webp')
+          logo_v = Path(f'web/assets/ui/retro-slide-tales-logo-{version}.webp')
+
+          app_v.write_bytes(app.read_bytes())
+          css_v.write_bytes(css.read_bytes())
+          logo_v.write_bytes(logo_src.read_bytes())
+
+          h = index.read_text()
+          h = h.replace('./styles.css', f'./styles-{version}.css')
+          h = h.replace('./app.js', f'./app-{version}.js')
+          if 'slide-tales-ui-version' not in h:
+              h = h.replace('<meta name="theme-color" content="#F2C84B" />',
+                            '<meta name="theme-color" content="#F2C84B" />\n  <meta name="slide-tales-ui-version" content="comic-v8" />')
+          index.write_text(h)
+
+          # Point the logo to the versioned file in the versioned app bundle.
+          s = app_v.read_text().replace('./assets/ui/retro-slide-tales-logo.webp',
+                                        f'./assets/ui/retro-slide-tales-logo-{version}.webp')
+          app_v.write_text(s)
+
+          if sw.exists():
+              x = sw.read_text()
+              x = re.sub(r"const SHELL_CACHE='[^']+';", "const SHELL_CACHE='slide-tales-shell-v8';", x, count=1)
+              x = re.sub(
+                  r"const SHELL=\[[^;]+\];",
+                  "const SHELL=['./','./index.html','./styles-comic-v8.css','./app-comic-v8.js','./assets/ui/retro-slide-tales-logo-comic-v8.webp'];",
+                  x,
+                  count=1
+              )
+              sw.write_text(x)
+
+          hdr = headers.read_text() if headers.exists() else ''
+          hdr += """
+/app-comic-v8.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/styles-comic-v8.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/ui/retro-slide-tales-logo-comic-v8.webp
+  Cache-Control: public, max-age=31536000, immutable
+
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+"""
+          headers.write_text(hdr)
+          PY
+
+          node --check web/app-comic-v8.js
+          cp slide-tales-ui/smoke-ui.js /tmp/smoke-ui-v8.js
+          sed -i "s#web/app.js#web/app-comic-v8.js#g" /tmp/smoke-ui-v8.js
+          node /tmp/smoke-ui-v8.js
+
+          grep -q 'styles-comic-v8.css' web/index.html
+          grep -q 'app-comic-v8.js' web/index.html
+          grep -q 'slide-tales-ui-version' web/index.html
+          test -s web/assets/ui/retro-slide-tales-logo-comic-v8.webp
+
       - name: Install asset tools
         run: |
           sudo apt-get update
@@ -1075,4 +1150,4 @@ jobs:
       - name: Deploy static site to Netlify
         working-directory: web
         run: |
-          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..oi-5SGa-vmbklJCp.kL5T60G2GsRLsdThBRctHEqf01SsfjcM9NGISgMh7rX7mG3SglSAE-05j5h1sscgLbnQNfwb0ga-LNho6IKctTVZpmgKOtihU_gj1XQ0NPPiX5mi6vnoFlODIOs7y25QZqFvcJ6BhiB2_FaaVsr1oZPptw6Az6AjPIRUUG6mM7y8_dJFziHGMjWWkvjK4Dn6FvmsZIv4vVeNIsvfBpHuZztn__LkPjwNk9OdhonQuRkYRuyfLnioipHG6tbhReoQbJr_n1A0RWLdbDA5NDnylhkpoed0gaCIuBka6agLCBg48ao8ypBMO_GZ8rUPbPgqgiqhPQ0ozh_hxRLZrKtdqYnXJdP0ZJBp7BEHgMqJahAg38sn71haoreHZ8WoN5mU4UB2EmfJ.BxIT4_BTHTT522o2ta6cNw" --no-wait
+          npx -y @netlify/mcp@latest --site-id ae95bf36-a8d3-4124-9791-261953c90c18 --proxy-path "https://netlify-mcp.netlify.app/proxy/eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0..Ry2Ube38caKdFeV4.jdLF3HAmxqyZjNO6Bz-7XTy2hT4ZDzxBztNxGuWfIlq9nc_jkAIVPSejM1MylOceTq3JKNop-ZlbijkT4wLkkidUQewYTCOaU9LU7WJRN6fwIzuPuAATLIGujT5mmxqkWqjCr0NZsoEy3VrhZmloHY0w4Ij8ZrEFiPW-YPyedcqoWSrzR3tdNzGahozxdjQ1aax6xjA9xoKoW9hgT14T2n36JgiVDl_tO5-1WNNJzExCZPfnWp32yzXaFTEVZmk8VxCujXKuKWKSiJvK0vP2Ay3MvAd-aXQqsNUKYk3xuZyoyFiZ6oy_UAtQI14mFO43gXL_l_oquOpSrAtlOYFMMd5lZeYTQbOFX2zs5IHiFkfp0EDAnw1nY_qp5lqw5bWAK6gtGLF4.vmAVCVDVP3-c7YK0iI2O4Q" --no-wait
