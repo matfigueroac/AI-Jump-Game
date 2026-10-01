@@ -149,7 +149,7 @@ home = r'''function renderHome() {
     '<div class="hero-lockup"><p class="hero-copy">PICK · SLIDE · SOLVE</p><p class="hero-sub"><span class="daily-dot">●</span> TODAY · ' + featured.title.toUpperCase() + '</p></div>' +
     '<div class="player-strip"><button class="player-level" data-action="profile"><b>LV ' + level + '</b><span>' + xp.current + '/12 ★</span></button><div class="xp-track"><i style="--xp:' + xp.pct + '%"></i></div><div class="streak-pill"><b>🔥 ' + streak + '</b><span>STREAK</span></div></div>' +
     '<div class="week-strip">' + weeklyStreakMarkup() + '</div>' +
-    '<div class="quest-panel"><div class="quest-title"><b>TODAY\\'S GOALS</b><span>' + questDone + '/3</span></div><div class="quest-row">' + questMarkup() + '</div></div>' +
+    '<div class="quest-panel"><div class="quest-title"><b>TODAY’S GOALS</b><span>' + questDone + '/3</span></div><div class="quest-row">' + questMarkup() + '</div></div>' +
     levelSelector() +
     '<div class="preview"><img fetchpriority="high" decoding="async" src="' + puzzleSrc(featured.id) + '" alt="' + featured.title + '">' + previewGrid() + '<span class="preview-chip">' + state.size + '×' + state.size + '</span></div>' +
     '<div class="daily-meta"><span>DAILY #' + dailyNumber() + '</span><span>' + (dailyDone ? '✓ COMPLETED' : '+2 ★ REWARD') + '</span></div>' +
@@ -178,7 +178,7 @@ profile_render = r'''
       '<div class="profile-hero"><button class="back" data-action="back-profile">←</button><div><small>PLAYER CARD</small><h1>SLIDE HERO</h1><p>Level ' + playerLevel(total) + ' · ' + total + ' stars</p></div><button class="sound-toggle ' + (state.profile.soundEnabled ? 'on' : 'off') + '" data-action="toggle-sound"><b>' + (state.profile.soundEnabled ? '♪' : '×') + '</b><span>SOUND</span></button></div>' +
       '<div class="profile-level"><div><b>LV ' + playerLevel(total) + '</b><span>' + xp.current + '/12 ★ TO NEXT</span></div><div class="xp-track big"><i style="--xp:' + xp.pct + '%"></i></div></div>' +
       '<div class="profile-stats"><article><b>' + solved + '</b><span>TALES</span></article><article><b>' + total + '</b><span>STARS</span></article><article><b>🔥 ' + streak + '</b><span>STREAK</span></article><article><b>' + complete + '</b><span>WORLDS</span></article></div>' +
-      '<div class="profile-section"><div class="section-title"><b>TODAY\\'S GOALS</b><span>' + quests.filter(q => q.done).length + '/3</span></div><div class="quest-row profile-quests">' + questMarkup() + '</div></div>' +
+      '<div class="profile-section"><div class="section-title"><b>TODAY’S GOALS</b><span>' + quests.filter(q => q.done).length + '/3</span></div><div class="quest-row profile-quests">' + questMarkup() + '</div></div>' +
       '<div class="profile-section"><div class="section-title"><b>BADGES</b><span>' + achievements().filter(a => a.done).length + '/6</span></div><div class="achievements">' + achievementMarkup() + '</div></div>' +
       '<button class="action red profile-play" data-action="continue" data-id="' + continuePuzzle().id + '">▶ CONTINUE JOURNEY</button>' +
     '</section>');
